@@ -123,7 +123,17 @@ esac
 if [ "$SKIP_PULL" -eq 1 ]; then
 	say "跳过拉取，使用当前工作区。"
 else
-	git fetch --prune --depth=1 origin "$REF"
+	# 国内主机到 GitHub 偶发 GnuTLS -110，单次抖动不该让整次发布失败。
+	FETCH_OK=0
+	for attempt in 1 2 3 4; do
+		if git fetch --prune --depth=1 origin "$REF"; then
+			FETCH_OK=1
+			break
+		fi
+		say "拉取失败（第 ${attempt} 次），重试中……"
+		sleep $((attempt * 3))
+	done
+	[ "$FETCH_OK" -eq 1 ] || die "从 ${ORIGIN_URL} 拉取 ${REF} 连续 4 次失败，请检查网络后重试"
 	git checkout -q --detach FETCH_HEAD
 	say "已切换到 $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
 	say "  代码来源：${ORIGIN_URL}"
