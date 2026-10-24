@@ -102,10 +102,10 @@ Caddy 配置是单文件 bind mount：
 | 检查 | 结果 |
 | --- | --- |
 | `GET /api/v1/health/live/` | `{"status":"ok","service":"tiyoujie","ai":"disabled"}` |
-| `GET /api/v1/auth/capabilities/` | `dev_login_available=false`（生产已关测试登录）、`wechat_configured=true`（AppSecret 于 2026-10-24 配置生效） |
-| AppSecret 真实性 | `verify-wechat.sh` 换到 access_token（有效期 6990s），不是"变量非空"式的通过 |
-| 登录链路真实调用微信 | 伪造 code → `400 WECHAT_CODE_INVALID`；未配置时为 `503 WECHAT_NOT_CONFIGURED`，两者可区分 |
-| 体验版产物 | 已上传开发版本 `0.1.0`（`api_base=https://tiyoujie.pxcore.com.cn`，`urlCheck=true`） |
+| `GET /api/v1/auth/capabilities/` | 换 AppID 后为 `dev_login_available=false`、`wechat_configured=false`（新 AppID 的 Secret 未提供）；此前 `wx38dee0ea...` 时期曾为 `wechat_configured=true` |
+| AppSecret 真实性 | 旧 AppID 时期 `verify-wechat.sh` 换到 access_token（有效期 6990s），不是"变量非空"式的通过；新 AppID 与旧 Secret 实测 `40125`，不配套 |
+| 登录链路真实调用微信 | 配置齐全时伪造 code → `400 WECHAT_CODE_INVALID`；未配置时为 `503 WECHAT_NOT_CONFIGURED`，两者可区分 |
+| 体验版产物 | 旧账号 `wx38dee0ea...` 上传过 `0.1.0`；换 AppID 后产物已用 `wxf3aaa9228368ef6e` 重建（`api_base=https://tiyoujie.pxcore.com.cn`，`urlCheck=true`） |
 | HTTP → HTTPS | 308 跳转到 `https://tiyoujie.pxcore.com.cn/...` |
 | 安全响应头 | HSTS 1 年含子域、`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: same-origin`、无 `Server` 头 |
 | 证书链 | 浏览器/curl 默认 CA 校验通过（无需 `-k`） |
@@ -124,9 +124,10 @@ Caddy 配置是单文件 bind mount：
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
-| 小程序 AppSecret | **DONE**（2026-10-24） | 已写入 `.env.prod`（`chmod 600`）。`verify-wechat.sh` 实测换到 access_token（有效期 6990s）；重启后 `capabilities` 变为 `wechat_configured: true`；用伪造 code 调 `/auth/wechat-login/` 返回 `400 WECHAT_CODE_INVALID`，证明后端确实调用了微信而不是本地短路 |
-| 小程序「服务器域名」白名单 | **BLOCKED（需人工）** | `wxa/modify_domain` 用两种 token（`stable_token` 与 `cgi-bin/token`）均返回 `errcode 40014 invalid access_token`，说明该接口对本账号不可用（或需服务商授权态），只能控制台配置：开发管理 → 开发设置 → 服务器域名，request / uploadFile / downloadFile 均填 `https://tiyoujie.pxcore.com.cn` |
-| 小程序体验版上传 | **DONE（开发版本 0.1.0）** | 2026-10-24 用 `py -3.12 scripts/wechat.py upload` 上传成功（`status: uploaded`），备注「首次体验版：登录+错题+题单+复习」。**未设为体验版、未提交审核**：需在后台版本管理里点「选为体验版」并添加体验成员 |
+| 小程序 AppID | **已切换**（2026-10-24） | `wx38dee0ea03214271` → `wxf3aaa9228368ef6e`。服务器 `.env.prod` 原子替换（备份 `.env.prod.bak-20261024T142540Z`），本地 `.env` 与构建产物同步。`openid` 与 AppID 绑定，换 AppID 等于换身份空间——切换时生产 `users=0`，无历史数据受影响 |
+| 小程序 AppSecret | **BLOCKED（新 AppID 的 Secret 未提供）** | 新 AppID 与旧 Secret 不配套（实测 `40125 invalid appsecret`），旧值已清空，因此 `capabilities` 为 `wechat_configured: false`、登录返回 `503 WECHAT_NOT_CONFIGURED`。**刻意保持诚实状态**：留着旧 Secret 会让 `wechat_configured` 显示 `true`，而每次登录都以 `40125` 失败，属于会骗过验收的假绿灯。拿到新 Secret 后执行 `./infra/deploy/rotate-wechat-credentials.sh --restart`（先验证后落盘） |
+| 小程序「服务器域名」白名单 | **BLOCKED（需人工，且要在新账号重配）** | `wxa/modify_domain` 用两种 token（`stable_token` 与 `cgi-bin/token`）均返回 `errcode 40014 invalid access_token`，说明该接口对本账号不可用（或需服务商授权态），只能控制台配置：开发管理 → 开发设置 → 服务器域名，request / uploadFile / downloadFile 均填 `https://tiyoujie.pxcore.com.cn`。**白名单不跨账号共享**，换 AppID 后必须在 `wxf3aaa9228368ef6e` 的后台重新填一遍 |
+| 小程序体验版上传 | **已重传到新账号**（开发版本 0.1.0） | 旧账号的 `0.1.0` 不跨账号。2026-10-24 用 `--appid wxf3aaa9228368ef6e` 重新构建并上传成功，说明开发者工具登录的微信对新小程序有开发权限。**未设为体验版、未提交审核**；登录需等新 Secret 到位 |
 | 真机端到端登录 | **NOT TESTED** | 依赖上一条的体验版设置与域名白名单，需真机扫码 |
 | 隐私政策与监护人告知 | **BLOCKED** | 版本 `2026-10-v1` 已内置；[文本已按实际数据流备好](../legal/privacy-notice.md)，仅缺运营主体名称/联系邮箱/生效日期 |
 | 平台 AI / OCR | 保持关闭 | 无合同、凭证与授权样本 |

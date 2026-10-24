@@ -6,8 +6,8 @@ from scripts.wechat import configuration
 class WechatConfigurationTests(unittest.TestCase):
     def test_configures_real_appid_and_https_without_embedded_credentials(self):
         self.assertEqual(
-            configuration("wx38dee0ea03214271", "https://api.example.invalid/"),
-            ("wx38dee0ea03214271", "https://api.example.invalid"),
+            configuration("wx0123456789abcdef", "https://api.example.invalid/"),
+            ("wx0123456789abcdef", "https://api.example.invalid"),
         )
 
     def test_rejects_tourist_id_and_unsafe_api_origins(self):
@@ -20,12 +20,12 @@ class WechatConfigurationTests(unittest.TestCase):
             "https://api.example.invalid/?key=hidden",
         ):
             with self.assertRaises(ValueError):
-                configuration("wx38dee0ea03214271", origin)
+                configuration("wx0123456789abcdef", origin)
 
     def test_ui_only_has_no_fake_endpoint_and_still_rejects_http(self):
-        self.assertEqual(configuration("wx38dee0ea03214271", "", ui_only=True)[1], "")
+        self.assertEqual(configuration("wx0123456789abcdef", "", ui_only=True)[1], "")
         with self.assertRaises(ValueError):
-            configuration("wx38dee0ea03214271", "http://127.0.0.1", ui_only=True)
+            configuration("wx0123456789abcdef", "http://127.0.0.1", ui_only=True)
 
 
 if __name__ == "__main__":
