@@ -205,8 +205,16 @@ if [ "$(container_hash)" != "$(md5sum "$CADDYFILE" | awk '{print $1}')" ]; then
 	fi
 fi
 
-# 用容器真实环境的变量在容器内校验（含 {$GENERATION_API_DOMAIN} 等）。
-if ! docker run --rm -e GENERATION_API_DOMAIN="${GENERATION_API_DOMAIN:-}" \
+# 临时容器校验语法。Caddyfile 里可能有 {$VAR} 占位符（其它站点在用），
+# 变量必须从**目标容器**里取，宿主 shell 通常没有，取不到会误判成语法错误。
+ENV_ARGS=()
+for name in $(sed -n 's/.*{\$\([A-Za-z_][A-Za-z0-9_]*\)}.*/\1/p' "$CADDYFILE" | sort -u); do
+	value="$(docker exec "$CADDY_CONTAINER" printenv "$name" 2>/dev/null || true)"
+	if [ -n "$value" ]; then
+		ENV_ARGS+=(-e "${name}=${value}")
+	fi
+done
+if ! docker run --rm ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} \
 	--add-host host.docker.internal:host-gateway \
 	-v "${CADDYFILE}:/etc/caddy/Caddyfile:ro" "${CADDY_IMAGE:-caddy:2.10-alpine}" \
 	caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
