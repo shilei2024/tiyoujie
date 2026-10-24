@@ -6,7 +6,7 @@
 
 ## 当前交付
 
-2026-10-24：已推进至 Phase 8。Phase 5 交付题库导入、权利审核、数学核验、检索与变式草稿；Phase 6 交付题单、作答、间隔复习、趋势与渲染时导出；Phase 7 交付备份/恢复演练；Phase 8 交付真实域名接入（tiyoujie.pxcore.com.cn）与一键发布：Caddy 自动签发证书、应用只绑回环、发布失败自动回滚、CI 覆盖生产配置静态校验。后端 203 项测试、Caddy 2.10 边缘层本机演练、生产编排合并与 `check --deploy` 均通过。**整体 PARTIAL：真实证书签发、真实主机发布、微信 AppSecret/真机与题库许可仍未验收，公开发布 NO GO；可上线范围仅限人工错题、题单、复习与导出。**
+2026-10-24：**已在腾讯云主机上线 https://tiyoujie.pxcore.com.cn**。Phase 5 交付题库导入、权利审核、数学核验、检索与变式草稿；Phase 6 交付题单、作答、间隔复习、趋势与渲染时导出；Phase 7 交付备份/恢复演练；Phase 8 交付域名接入与一键发布；Phase 9 在真机完成部署：容器化 Caddy 复用主机 80/443、应用只绑 docker0、Let's Encrypt 证书自动签发，5 个容器健康，`check --deploy` 0 issue。**应用已可访问；但微信登录仍 BLOCKED（AppSecret 未提供、服务器域名白名单未加），因此真机登录与端到端流程 NOT TESTED，公开发布结论仍为 NO GO。**
 
 ## 阅读入口
 
@@ -15,6 +15,7 @@
 | 发布门禁与状态 | [发布门禁](docs/acceptance/release-gates.md) |
 | 发布结论、证据与阻断 | [发布报告](docs/acceptance/release-report.md) |
 | 上线前三步人工动作（DNS/SSH/AppSecret） | [人工步骤手册](docs/operations/go-live-manual-steps.md) |
+| **真机部署上线记录与验收** | [Phase 9 记录](docs/operations/phase-9-live-deployment.md) |
 | 真实域名上线（DNS/TLS/一键发布） | [上线手册](docs/operations/phase-8-deployment-pxcore.md) · [域名与 TLS](docs/operations/tls-and-domain.md) · [Phase 8 报告](docs/acceptance/phase-8-report.md) |
 | 备份恢复、部署与回滚 | [Phase 7 报告](docs/acceptance/phase-7-report.md) · [运维手册](docs/operations/phase-7-deployment.md) |
 | 题单、复习与导出 | [Phase 6 报告](docs/acceptance/phase-6-report.md) · [API](docs/api/phase-6-api.md) · [运维](docs/operations/phase-6-operations.md) |
