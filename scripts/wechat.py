@@ -13,6 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def configuration(appid, api_base, *, ui_only=False):
+    if not appid:
+        raise ValueError(
+            "No AppID: pass --appid wx... or export WECHAT_APP_ID. "
+            "manifest.json keeps it empty on purpose so a build can never "
+            "silently target the previous mini program account"
+        )
     if not re.fullmatch(r"wx[a-fA-F0-9]{16}", appid):
         raise ValueError(
             "Provide your actual wx + 16 hexadecimal AppID; touristappid is not valid"

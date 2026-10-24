@@ -8,7 +8,7 @@
   "uniStatistics": { "enable": false },
   "h5": { "router": { "mode": "hash" } },
   "mp-weixin": {
-    "appid": "wx38dee0ea03214271",
+    "appid": "",
     "setting": { "urlCheck": true },
     "usingComponents": true
   }

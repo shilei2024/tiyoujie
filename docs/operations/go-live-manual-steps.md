@@ -303,7 +303,9 @@ AppSecret 到位后，剩下的只有"上传 + 真机测"，都在你的 Windows
 1. 构建产物已经生成在 `frontend/dist/build/mp-weixin`（`--api-base https://tiyoujie.pxcore.com.cn`）。
    若改了代码需重新构建：`py -3.12 scripts/wechat.py build --api-base https://tiyoujie.pxcore.com.cn`
 2. 打开**微信开发者工具**（用小程序管理员或有开发权限的微信扫码登录）
-3. 菜单 **项目 → 导入项目**，目录选 `frontend/dist/build/mp-weixin`，AppID 选 `wx38dee0ea03214271`
+3. 菜单 **项目 → 导入项目**，目录选 `frontend/dist/build/mp-weixin`，AppID 填构建时
+   `--appid`（或环境变量 `WECHAT_APP_ID`）传的那个——仓库里已不再写死 AppID，
+   避免换账号后构建产物仍指向旧账号
 4. 打开后看右下角 **详情 → 域名信息**，确认 request 合法域名里有 `https://tiyoujie.pxcore.com.cn`
    （没有就先回上面「服务器域名白名单」把域名加上，再点"刷新"）
 5. 点右上角 **上传**，版本号填 `0.1.0`，备注写 `首次体验版`，确定
@@ -314,6 +316,58 @@ AppSecret 到位后，剩下的只有"上传 + 真机测"，都在你的 Windows
 
 任何一步报错，请把**手机上的提示文字**或**开发者工具 Console 的报错原文**发给我，
 不要只说"不行"——真机上微信会把网络错误统一显示成"网络异常"，只有原文能定位。
+
+## 更换小程序 AppID / AppSecret
+
+AppID 和 Secret 必须**成对换**：只换 AppID 留着旧 Secret，微信会返回 `40013`/`40125`，
+登录立刻全挂；只换 Secret 而 AppID 还是旧的，则等于给旧账号换新密钥。
+
+服务器上一条命令搞定（顺序是「先向微信验证 → 再备份 → 原子写入 → 重启 → 复验」，
+任何一步失败都不会改动 `.env.prod`）：
+
+```bash
+cd /opt/tiyoujie/repo && ./infra/deploy/rotate-wechat-credentials.sh --restart
+```
+
+它会依次提示输入新 AppID 与新 Secret（Secret 输入不回显、不进 shell 历史），
+校验格式（`wx` + 16 位十六进制、Secret 32 位字母数字），用新凭据真去换 `access_token`，
+换到了才写文件。也可以走环境变量：
+
+```bash
+cd /opt/tiyoujie/repo && WX_NEW_APP_ID=wx... WX_NEW_APP_SECRET=... ./infra/deploy/rotate-wechat-credentials.sh --restart
+```
+
+### 换 AppID 会连带改变的三件事
+
+1. **身份空间变了**：`openid` 与 AppID 绑定，身份表按 `(provider, app_id, subject)` 建键，
+   换 AppID 后同一个微信登录会得到**全新账号**，旧账号数据不会自动迁移。
+   （当前生产 `users=0`，暂无影响；一旦有真实用户就不能随意换。）
+2. **客户端必须重新构建并上传**：旧的体验版属于旧账号，不会出现在新账号里。
+   本机执行：
+   ```bash
+   py -3.12 scripts/wechat.py build --appid wx新AppID --api-base https://tiyoujie.pxcore.com.cn
+   py -3.12 scripts/wechat.py upload --appid wx新AppID --api-base https://tiyoujie.pxcore.com.cn --version 0.1.0
+   ```
+   构建产物里有一份 `tiyoujie-build.json` 记录所用 AppID/API 域名，与当前参数不一致时
+   `upload` 会拒绝执行——必须先重建，不能拿旧产物上传。
+3. **域名白名单要在新账号里重配**：新 AppID 是另一个小程序后台，白名单不共享，
+   按上一节把 `https://tiyoujie.pxcore.com.cn` 填进 request / uploadFile / downloadFile。
+
+换完用下面两条确认（应看到 `wechat_configured: true`，伪造 code 返回 `400 WECHAT_CODE_INVALID`）：
+
+```bash
+curl -s https://tiyoujie.pxcore.com.cn/api/v1/auth/capabilities/
+curl -s -X POST -H 'Content-Type: application/json' -d '{"code":"probe"}' \
+  -w '\n[%{http_code}]\n' https://tiyoujie.pxcore.com.cn/api/v1/auth/wechat-login/
+```
+
+回滚（脚本会自动打印带时间戳的备份路径）：
+
+```bash
+cp -p /opt/tiyoujie/repo/.env.prod.bak-<时间戳> /opt/tiyoujie/repo/.env.prod
+cd /opt/tiyoujie/repo && docker compose --project-directory . --env-file .env.prod \
+  -f compose.yaml -f infra/deploy/compose.prod.yaml -p tiyoujie up -d --wait --no-build api worker beat
+```
 
 ## 三件事完成后，我这边会做什么
 
