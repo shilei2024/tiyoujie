@@ -35,7 +35,7 @@ def client_ip(request):
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
-def rate_limit(request, operation="auth"):
+def rate_limit(request, operation="auth", count=None):
     identity = str(request.user.pk) if request.user.is_authenticated else client_ip(request)
     identity = hmac.new(settings.SECRET_KEY.encode(), identity.encode(), hashlib.sha256).hexdigest()
     key = f"limit:{settings.AUTH_THROTTLE_NAMESPACE}:{operation}:{identity}"
@@ -47,12 +47,14 @@ def rate_limit(request, operation="auth"):
         with Redis.from_url(
             settings.REDIS_URL, socket_timeout=2, socket_connect_timeout=2
         ) as client:
-            count = client.eval(script, 1, key)
+            hits = client.eval(script, 1, key)
     except Exception:
         raise AppError(
             "AUTH_LIMITER_UNAVAILABLE", "暂时无法验证请求频率，请稍后重试。", 503
         ) from None
-    if count > settings.AUTH_RATE_LIMIT_COUNT:
+    # 同一条 Redis 计数逻辑供不同入口复用：auth 走宽松阈值，后台登录必须更紧。
+    limit = settings.AUTH_RATE_LIMIT_COUNT if count is None else count
+    if hits > limit:
         raise AppError("RATE_LIMITED", "操作过于频繁，请一分钟后重试。", 429)
 
 

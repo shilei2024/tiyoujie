@@ -44,6 +44,8 @@ def configure(environment):
             "django.middleware.common.CommonMiddleware",
             "django.middleware.csrf.CsrfViewMiddleware",
             "django.contrib.auth.middleware.AuthenticationMiddleware",
+            # 放在认证之后：限流要能识别已登录用户，且后台登录需要独立更紧的阈值。
+            "apps.accounts.middleware.AdminLoginThrottle",
             "django.contrib.messages.middleware.MessageMiddleware",
             "django.middleware.clickjacking.XFrameOptionsMiddleware",
         ],
@@ -97,6 +99,8 @@ def configure(environment):
         "ACCESS_TOKEN_MINUTES": 15,
         "REFRESH_TOKEN_DAYS": 14,
         "AUTH_RATE_LIMIT_COUNT": 20,
+        # 后台登录页挂在公网域名上，阈值必须比业务接口紧；Django admin 自身没有防爆破。
+        "ADMIN_LOGIN_LIMIT_COUNT": 10,
         "AUTH_THROTTLE_NAMESPACE": environment,
         "PRACTICE_TIME_ZONE": "Asia/Shanghai",
         "DATA_UPLOAD_MAX_MEMORY_SIZE": 65536,
