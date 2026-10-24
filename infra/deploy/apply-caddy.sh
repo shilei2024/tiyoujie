@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# 把本项目的站点块安全地并入主机 Caddyfile。
+# 把本项目的站点块安全地并入主机上**容器化 Caddy** 的 Caddyfile。
 #
-# 设计前提：本机 Caddy 可能已经在为其它小程序服务，因此本脚本
-#   * 只做“插入/替换本域名块”，绝不动其它站点；
-#   * 改前备份、改后校验，校验失败自动回滚；
-#   * 可重复执行（幂等），重复跑不会产生重复站点块。
+# 目标主机实测形态（2026-10-24）：
+#   * Caddy 跑在容器 mindfulpenpal-ai-production-caddy-1（caddy:2.10-alpine）；
+#   * 它的 Caddyfile 是 bind mount：
+#       /opt/mytoolbox/services/generation-service/deploy/Caddyfile.production
+#       -> /etc/caddy/Caddyfile
+#   * 同一份配置里还有 mindfulpenpal.com、api.pxcore.com.cn（另一个小程序）等站点块。
+#
+# 因此本脚本：
+#   * 只做“插入/替换本域名块”，绝不触碰其它站点块；
+#   * 改前备份、改后校验，校验或重载失败自动回滚；
+#   * 幂等，重复执行不会产生重复站点块。
 #
 # 用法：
 #   sudo ./apply-caddy.sh --domain tiyoujie.pxcore.com.cn --upstream 18010 --dry-run
@@ -14,7 +21,9 @@ set -euo pipefail
 
 DOMAIN=""
 UPSTREAM="18010"
-CADDYFILE="/etc/caddy/Caddyfile"
+CADDYFILE=""
+CADDY_CONTAINER=""
+BACKUP_DIR="/opt/tiyoujie/backups/caddy"
 DRY_RUN=0
 REMOVE=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +49,14 @@ while [ $# -gt 0 ]; do
 		CADDYFILE="${2:-}"
 		shift 2
 		;;
+	--container)
+		CADDY_CONTAINER="${2:-}"
+		shift 2
+		;;
+	--backup-dir)
+		BACKUP_DIR="${2:-}"
+		shift 2
+		;;
 	--dry-run)
 		DRY_RUN=1
 		shift
@@ -49,12 +66,10 @@ while [ $# -gt 0 ]; do
 		shift
 		;;
 	-h | --help)
-		sed -n '2,16p' "$0"
+		sed -n '2,22p' "$0"
 		exit 0
 		;;
-	*)
-		die "未知参数 $1"
-		;;
+	*) die "未知参数 $1" ;;
 	esac
 done
 
@@ -65,7 +80,32 @@ esac
 case "$UPSTREAM" in
 '' | *[!0-9]*) die "--upstream 必须是端口号" ;;
 esac
-[ -f "$CADDYFILE" ] || die "找不到 $CADDYFILE"
+
+command -v docker >/dev/null 2>&1 || die "本机没有 docker"
+
+# 自动识别：正在发布 443 的 caddy 容器，以及它的 Caddyfile 在宿主机上的路径。
+if [ -z "$CADDY_CONTAINER" ]; then
+	CADDY_CONTAINER="$(docker ps --filter "publish=443" --format '{{.Names}} {{.Image}}' |
+		awk '$2 ~ /^caddy[:@]/ {print $1; exit}')"
+fi
+[ -n "$CADDY_CONTAINER" ] || die "找不到发布 443 端口的 caddy 容器，请用 --container 指定"
+
+MOUNT_INFO="$(docker inspect "$CADDY_CONTAINER" --format \
+	'{{range .Mounts}}{{.Type}}|{{.Source}}|{{.Destination}}{{"\n"}}{{end}}' |
+	grep -F '|/etc/caddy/Caddyfile' || true)"
+[ -n "$MOUNT_INFO" ] || die "容器 ${CADDY_CONTAINER} 的 Caddyfile 不是 bind mount，本脚本不支持该形态"
+CONTAINER_PATH="/etc/caddy/Caddyfile"
+MOUNT_SOURCE="$(printf '%s' "$MOUNT_INFO" | head -1 | cut -d'|' -f2)"
+
+if [ -z "$CADDYFILE" ]; then
+	CADDYFILE="$MOUNT_SOURCE"
+fi
+[ -f "$CADDYFILE" ] || die "找不到 Caddyfile：$CADDYFILE"
+[ "$CADDYFILE" = "$MOUNT_SOURCE" ] ||
+	die "传入的 --caddyfile ($CADDYFILE) 与容器挂载源 ($MOUNT_SOURCE) 不一致，会导致校验结果失真"
+
+say "Caddy 容器：${CADDY_CONTAINER}"
+say "Caddyfile：${CADDYFILE}（容器内 ${CONTAINER_PATH}）"
 
 START="# >>> tiyoujie ${DOMAIN} >>>"
 END="# <<< tiyoujie ${DOMAIN} <<<"
@@ -83,33 +123,16 @@ render_block() {
 	sed -e "s/__DOMAIN__/${DOMAIN}/g" -e "s/__UPSTREAM__/${UPSTREAM}/g" "$TEMPLATE"
 }
 
+# 在真实容器里校验：文件是 bind mount，改完立刻可见，且能拿到真实环境变量
+# （例如 {$GENERATION_API_DOMAIN}），单独起临时容器会因缺变量误报失败。
 validate_file() {
-	local file="$1"
-	if command -v caddy >/dev/null 2>&1; then
-		caddy validate --config "$file" --adapter caddyfile >/dev/null 2>&1
-	elif command -v docker >/dev/null 2>&1; then
-		docker run --rm -v "${file}:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
-			caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1
-	else
-		say "提示：本机既没有 caddy 也没有 docker，跳过语法校验。"
-		return 0
-	fi
+	docker exec "$CADDY_CONTAINER" caddy validate \
+		--config "$CONTAINER_PATH" --adapter caddyfile >/dev/null 2>&1
 }
 
 reload_caddy() {
-	if [ "$DRY_RUN" -eq 1 ]; then
-		say "（预演）此处会重载 Caddy。"
-		return 0
-	fi
-	if systemctl is-active --quiet caddy 2>/dev/null; then
-		systemctl reload caddy
-	elif command -v caddy >/dev/null 2>&1; then
-		caddy reload --config "$CADDYFILE" --adapter caddyfile
-	elif command -v docker >/dev/null 2>&1; then
-		docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
-	else
-		die "无法重载 Caddy：请手动 systemctl reload caddy"
-	fi
+	docker exec "$CADDY_CONTAINER" caddy reload \
+		--config "$CONTAINER_PATH" --adapter caddyfile >/dev/null 2>&1
 }
 
 TMP="$(mktemp)"
@@ -143,28 +166,26 @@ if [ "$DRY_RUN" -eq 1 ]; then
 	exit 0
 fi
 
-BACKUP="${CADDYFILE}.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP_DIR"
+BACKUP="${BACKUP_DIR}/Caddyfile.production.$(date -u +%Y%m%dT%H%M%SZ)"
 cp -a "$CADDYFILE" "$BACKUP"
 say "已备份原配置：$BACKUP"
 
-install -m 0644 "$TMP" "$CADDYFILE"
-if ! validate_file "$CADDYFILE"; then
+# 保留原文件权限再写入，避免容器内外权限不一致。
+install -m "$(stat -c '%a' "$BACKUP")" "$TMP" "$CADDYFILE"
+
+if ! validate_file; then
 	cp -a "$BACKUP" "$CADDYFILE"
 	die "Caddy 语法校验失败，已自动还原 $CADDYFILE"
 fi
-say "语法校验通过。"
-
-if [ -d /var/log/caddy ]; then
-	chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
-else
-	mkdir -p /var/log/caddy && chown caddy:caddy /var/log/caddy 2>/dev/null || true
-fi
+say "语法校验通过（在真实容器内执行）。"
 
 if ! reload_caddy; then
 	cp -a "$BACKUP" "$CADDYFILE"
-	reload_caddy || true
+	reload_caddy || say "警告：回滚后的重载也失败了，请人工检查 docker logs ${CADDY_CONTAINER}"
 	die "重载失败，已还原 $CADDYFILE"
 fi
 
-say "完成：https://${DOMAIN}/ 已指向 127.0.0.1:${UPSTREAM}，证书由 Caddy 自动申请。"
-say "首次申请证书通常 10-60 秒；可用 curl -I https://${DOMAIN}/api/v1/health/live/ 观察。"
+say "完成：https://${DOMAIN}/ 已指向 host.docker.internal:${UPSTREAM}。"
+say "证书由 Caddy 自动申请，通常 10-60 秒；可用下面的命令观察："
+say "  curl -sI https://${DOMAIN}/api/v1/health/live/"

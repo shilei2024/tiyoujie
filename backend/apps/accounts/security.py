@@ -19,12 +19,24 @@ def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def client_ip(request):
+    """取真实客户端 IP。
+
+    生产环境前面有一层边缘代理（Caddy），Django 看到的 REMOTE_ADDR 永远是代理地址，
+    直接拿它做限流会让所有用户共用一个桶：正常用户会被别人拖慢，攻击者也只需打满
+    一个桶就能让全部人登录失败。只有确认自己部署在代理之后（deployed）才信任
+    X-Forwarded-For，并且取**最后一跳**——前面的值是客户端可以随便伪造的。
+    """
+    if settings.TRUST_FORWARDED_FOR:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+        if hops:
+            return hops[-1]
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
 def rate_limit(request, operation="auth"):
-    identity = (
-        str(request.user.pk)
-        if request.user.is_authenticated
-        else request.META.get("REMOTE_ADDR", "unknown")
-    )
+    identity = str(request.user.pk) if request.user.is_authenticated else client_ip(request)
     identity = hmac.new(settings.SECRET_KEY.encode(), identity.encode(), hashlib.sha256).hexdigest()
     key = f"limit:{settings.AUTH_THROTTLE_NAMESPACE}:{operation}:{identity}"
     script = (

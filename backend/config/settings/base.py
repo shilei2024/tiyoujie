@@ -152,6 +152,8 @@ def configure(environment):
         # 不信任该头会导致 SECURE_SSL_REDIRECT 把每个请求再跳一次，形成重定向死循环。
         # 因此只在部署环境启用，且应用端口必须只绑定回环地址，避免外部伪造该头。
         "SECURE_PROXY_SSL_HEADER": ("HTTP_X_FORWARDED_PROTO", "https") if deployed else None,
+        # 仅部署在代理之后时信任 X-Forwarded-For（限流按真实客户端 IP 计）。
+        "TRUST_FORWARDED_FOR": deployed,
         "SECURE_HSTS_SECONDS": 31536000 if deployed else 0,
         "SECURE_HSTS_INCLUDE_SUBDOMAINS": deployed,
         "SECURE_HSTS_PRELOAD": deployed,

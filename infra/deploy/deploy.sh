@@ -2,7 +2,8 @@
 # 服务器端发布脚本：拉代码 → 构建镜像 → 备份数据库 → 迁移 → 起服务 → 健康检查。
 # 任何一步失败都会把 API_IMAGE 还原到上一个镜像并重新拉起，避免“半新半旧”。
 #
-# 前置：setup-host.sh 已执行，apply-caddy.sh 已配置域名与证书。
+# 前置：setup-host.sh 已执行；首次上线需额外跑 apply-caddy.sh 配置域名与证书
+#（或给本脚本加 --apply-caddy，发布成功后自动执行）。
 # 用法（在 /opt/tiyoujie/repo 下以 root 执行）：
 #   ./infra/deploy/deploy.sh --ref main
 #   ./infra/deploy/deploy.sh --ref <commit-sha>
@@ -15,6 +16,7 @@ BACKUP_DIR="/opt/tiyoujie/backups"
 REF="main"
 ROLLBACK=0
 SKIP_PULL=0
+APPLY_CADDY=0
 HEALTH_TIMEOUT=60
 
 say() { printf '%s\n' "$1"; }
@@ -37,6 +39,10 @@ while [ $# -gt 0 ]; do
 		SKIP_PULL=1
 		shift
 		;;
+	--apply-caddy)
+		APPLY_CADDY=1
+		shift
+		;;
 	-h | --help)
 		sed -n '2,10p' "$0"
 		exit 0
@@ -54,7 +60,6 @@ COMPOSE=(
 	--env-file "$ENV_FILE"
 	-f compose.yaml
 	-f infra/deploy/compose.prod.yaml
-	-f infra/deploy/compose.caddy.yaml
 	-p tiyoujie
 )
 
@@ -85,6 +90,18 @@ https://*) : ;;
 *) die "DJANGO_CSRF_TRUSTED_ORIGINS 必须是 https:// 开头" ;;
 esac
 API_PORT="$(env_value API_HOST_PORT)"
+BIND_IP="$(env_value API_BIND_IP)"
+[ -n "$BIND_IP" ] || {
+	BIND_IP="172.17.0.1"
+	set_env_value API_BIND_IP "$BIND_IP"
+}
+# API 只绑 docker0，由主机既有 Caddy 容器经 host.docker.internal 回源。
+# docker0 地址会随 Docker 重建而变，变了必须显式修正，否则对公网不可达却看不出原因。
+DOCKER0_IP="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)"
+[ -n "$DOCKER0_IP" ] || die "找不到 docker0 网卡，无法确定 API 绑定地址"
+[ "$DOCKER0_IP" = "$BIND_IP" ] ||
+	die "API_BIND_IP=${BIND_IP} 与当前 docker0=${DOCKER0_IP} 不一致；请执行 sed -i 's|^API_BIND_IP=.*|API_BIND_IP=${DOCKER0_IP}|' .env.prod 后重试"
+say "API 绑定：${BIND_IP}:${API_PORT}（仅 docker0，公网不可达）"
 PREVIOUS_IMAGE="$(env_value API_IMAGE)"
 
 say "== 1/6 取代码 =="
@@ -152,15 +169,22 @@ say "== 6/6 启动应用并健康检查 =="
 "${COMPOSE[@]}" up -d --wait api worker beat
 
 for _ in $(seq "$HEALTH_TIMEOUT"); do
-	if curl -fsS "http://127.0.0.1:${API_PORT}/api/v1/health/ready/" >/dev/null 2>&1; then
+	if curl -fsS "http://${BIND_IP}:${API_PORT}/api/v1/health/ready/" >/dev/null 2>&1; then
 		trap - ERR
 		say ""
 		say "发布成功：${IMAGE}"
 		say "  镜像摘要：${IMAGE_ID}"
-		say "  本地就绪探针：http://127.0.0.1:${API_PORT}/api/v1/health/ready/"
+		say "  就绪探针：http://${BIND_IP}:${API_PORT}/api/v1/health/ready/"
 		DOMAIN="$(env_value DJANGO_ALLOWED_HOSTS | cut -d, -f1)"
 		say "  对外域名：https://${DOMAIN}/api/v1/health/live/"
 		say "  回滚命令：./infra/deploy/deploy.sh --rollback"
+		if [ "$APPLY_CADDY" -eq 1 ]; then
+			say ""
+			say "== 附加：把站点块并入主机 Caddy =="
+			"${REPO_DIR}/infra/deploy/apply-caddy.sh" \
+				--domain "$(env_value DJANGO_ALLOWED_HOSTS | cut -d, -f1)" \
+				--upstream "$API_PORT"
+		fi
 		exit 0
 	fi
 	sleep 1

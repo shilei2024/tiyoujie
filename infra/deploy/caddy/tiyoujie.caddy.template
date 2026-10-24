@@ -1,8 +1,10 @@
-# 由 infra/deploy/apply-caddy.sh 渲染后追加到主机 Caddyfile，不要直接手改生成结果。
+# 由 infra/deploy/apply-caddy.sh 渲染后并入主机 Caddyfile，不要直接手改生成结果。
 #
-# 两条硬约束：
+# 目标主机上 Caddy 是容器（mindfulpenpal-ai-production-caddy-1），不是 systemd 服务，
+# 因此有三条硬约束：
 # 1. 站点地址必须写完整域名（不要写 :443），Caddy 才会自动申请证书；
-# 2. 上游必须是回环地址 —— 应用端口没有防火墙保护，只允许本机代理访问。
+# 2. 上游必须走 host.docker.internal —— 容器里的 127.0.0.1 是它自己，不是宿主机；
+# 3. 不要写文件日志：容器内没有可持久化的日志目录，访问日志走 docker logs 即可。
 
 __DOMAIN__ {
 	encode zstd gzip
@@ -20,12 +22,13 @@ __DOMAIN__ {
 		max_size 9MB
 	}
 
-	# 健康检查不加访问日志，避免探针刷日志。
+	# 健康检查不进访问日志，避免探针刷屏。
 	@health path /api/v1/health/*
 	log_skip @health
 
-	reverse_proxy 127.0.0.1:__UPSTREAM__ {
-		header_up X-Forwarded-Proto https
+	# X-Forwarded-For / X-Forwarded-Proto 由 Caddy 自动写入（会覆盖客户端伪造值），
+	# 后端只在 deployed 环境下信任它，见 accounts/security.py。
+	reverse_proxy host.docker.internal:__UPSTREAM__ {
 		header_up X-Real-IP {remote_host}
 		transport http {
 			read_timeout 30s
@@ -35,11 +38,7 @@ __DOMAIN__ {
 	}
 
 	log {
-		output file /var/log/caddy/__DOMAIN__.log {
-			roll_size 20MiB
-			roll_keep 5
-			roll_keep_for 168h
-		}
+		output stdout
 		format json
 	}
 }

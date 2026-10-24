@@ -49,8 +49,9 @@ jobs:
           REDIS_URL=redis://:ci-only-redis-password@redis:6379/0
           API_IMAGE=tiyoujie-api:ci
           API_HOST_PORT=18010
+          API_BIND_IP=172.17.0.1
           EOF
-          COMPOSE="docker compose -p tiyoujie-ci --env-file .env.prod -f compose.yaml -f infra/deploy/compose.prod.yaml -f infra/deploy/compose.caddy.yaml"
+          COMPOSE="docker compose -p tiyoujie-ci --env-file .env.prod -f compose.yaml -f infra/deploy/compose.prod.yaml"
           $COMPOSE config --quiet
           $COMPOSE run --rm --no-deps api python manage.py check --deploy
       - name: Python dependency audit

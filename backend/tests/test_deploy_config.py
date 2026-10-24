@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, TestCase, override_settings
 
+from apps.accounts.security import client_ip
 from config.runtime import load_runtime
 from config.settings import base
 
@@ -55,11 +56,42 @@ class ProxyHeaderTests(SimpleTestCase):
             )
             self.assertTrue(settings["SECURE_SSL_REDIRECT"])
 
+    def test_deployed_settings_trust_forwarded_for(self):
+        for environment in ("staging", "prod"):
+            self.assertTrue(self.configure(environment)["TRUST_FORWARDED_FOR"])
+
     def test_local_settings_ignore_forwarded_proto(self):
         for environment in ("dev", "test"):
             settings = self.configure(environment)
             self.assertIsNone(settings["SECURE_PROXY_SSL_HEADER"])
             self.assertFalse(settings["SECURE_SSL_REDIRECT"])
+            self.assertFalse(settings["TRUST_FORWARDED_FOR"])
+
+
+class ClientIpTests(SimpleTestCase):
+    """限流身份必须落到真实客户端 IP，否则代理后全体用户共用一个桶。"""
+
+    def request(self, remote, forwarded=None):
+        meta = {"REMOTE_ADDR": remote}
+        if forwarded is not None:
+            meta["HTTP_X_FORWARDED_FOR"] = forwarded
+        return SimpleNamespace(META=meta)
+
+    def test_uses_last_hop_when_behind_proxy(self):
+        with override_settings(TRUST_FORWARDED_FOR=True):
+            ip = client_ip(self.request("172.17.0.1", "1.2.3.4, 203.0.113.9"))
+        # 前面的值客户端可伪造，只信任代理写入的最后一跳。
+        self.assertEqual(ip, "203.0.113.9")
+
+    def test_falls_back_to_remote_addr(self):
+        with override_settings(TRUST_FORWARDED_FOR=True):
+            self.assertEqual(client_ip(self.request("172.17.0.1")), "172.17.0.1")
+            self.assertEqual(client_ip(self.request("172.17.0.1", "  ,  ")), "172.17.0.1")
+
+    def test_ignores_spoofed_header_when_not_deployed(self):
+        with override_settings(TRUST_FORWARDED_FOR=False):
+            ip = client_ip(self.request("203.0.113.9", "10.0.0.1"))
+        self.assertEqual(ip, "203.0.113.9")
 
 
 class DeploymentGuardTests(SimpleTestCase):
