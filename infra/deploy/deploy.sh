@@ -127,7 +127,17 @@ if [ "$ROLLBACK" -eq 1 ]; then
 fi
 
 say "== 2/6 构建镜像 ${IMAGE} =="
-docker build -f infra/Dockerfile -t "$IMAGE" .
+# 受限网络下用镜像源构建；变量为空时保持官方源，不影响 CI 与其它环境。
+BUILD_ARGS=()
+for key in PYPI_INDEX PYPI_FILES_HOST; do
+	value="$(env_value "$key")"
+	if [ -n "$value" ]; then
+		BUILD_ARGS+=(--build-arg "${key}=${value}")
+	fi
+done
+[ ${#BUILD_ARGS[@]} -eq 0 ] ||
+	say "使用镜像源构建：${BUILD_ARGS[*]}"
+docker build ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} -f infra/Dockerfile -t "$IMAGE" .
 IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
 say "镜像摘要：${IMAGE_ID}"
 
