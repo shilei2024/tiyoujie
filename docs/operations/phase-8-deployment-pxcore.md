@@ -4,6 +4,8 @@
 
 前置阅读：[域名与 TLS](tls-and-domain.md)、[Phase 7 部署手册](phase-7-deployment.md)。
 
+需要人工完成的三件事见 [上线前三步人工动作](go-live-manual-steps.md)（DNS 记录、SSH 授权、小程序 AppSecret）。
+
 ## 0. 需要人为提供的东西
 
 | 项 | 谁提供 | 用途 | 缺失后果 |

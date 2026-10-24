@@ -14,6 +14,7 @@
 | --- | --- |
 | 发布门禁与状态 | [发布门禁](docs/acceptance/release-gates.md) |
 | 发布结论、证据与阻断 | [发布报告](docs/acceptance/release-report.md) |
+| 上线前三步人工动作（DNS/SSH/AppSecret） | [人工步骤手册](docs/operations/go-live-manual-steps.md) |
 | 真实域名上线（DNS/TLS/一键发布） | [上线手册](docs/operations/phase-8-deployment-pxcore.md) · [域名与 TLS](docs/operations/tls-and-domain.md) · [Phase 8 报告](docs/acceptance/phase-8-report.md) |
 | 备份恢复、部署与回滚 | [Phase 7 报告](docs/acceptance/phase-7-report.md) · [运维手册](docs/operations/phase-7-deployment.md) |
 | 题单、复习与导出 | [Phase 6 报告](docs/acceptance/phase-6-report.md) · [API](docs/api/phase-6-api.md) · [运维](docs/operations/phase-6-operations.md) |
