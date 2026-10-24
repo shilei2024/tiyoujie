@@ -103,7 +103,7 @@ async function loadChildren(append = false) {
       )
     ).results;
 }
-async function loadFamilies() {
+async function loadFamilies(preferId?: string) {
   const all: Family[] = [];
   let page: number | null = 1;
   while (page) {
@@ -114,8 +114,10 @@ async function loadFamilies() {
     page = result.next;
   }
   families.value = all;
-  session.family =
-    all.find((item) => item.id === session.family?.id) || all[0] || null;
+  // 列表按创建时间升序，缺省取 all[0] 是"最早的家庭"。
+  // 新建/加入后必须显式指定目标家庭，否则会在旧家庭里继续操作（孩子档案会建错地方）。
+  const wanted = preferId || session.family?.id;
+  session.family = all.find((item) => item.id === wanted) || all[0] || null;
   children.value = [];
   members.value = [];
   activeConsents.value = {};
@@ -168,10 +170,11 @@ function wechatLogin() {
 }
 function createFamily() {
   void run(async () => {
-    await api("families/", "POST", { name: familyName.value.trim() });
+    const created = await api<Family>("families/", "POST", {
+      name: familyName.value.trim(),
+    });
     familyName.value = "";
-    session.family = null;
-    await loadFamilies();
+    await loadFamilies(created.id);
   });
 }
 function saveChild() {
@@ -255,11 +258,11 @@ async function changeConsent(child: Child) {
 }
 function joinFamily() {
   void run(async () => {
-    await api("invitations/accept/", "POST", {
+    const joined = await api<Family>("invitations/accept/", "POST", {
       invitation_token: inviteToken.value.trim(),
     });
     inviteToken.value = "";
-    await loadFamilies();
+    await loadFamilies(joined.id);
     message.value = "已加入获授权的家庭。";
   });
 }
