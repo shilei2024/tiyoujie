@@ -17,6 +17,11 @@
 #   sudo ./apply-caddy.sh --domain tiyoujie.pxcore.com.cn --upstream 18010 --dry-run
 #   sudo ./apply-caddy.sh --domain tiyoujie.pxcore.com.cn --upstream 18010
 #   sudo ./apply-caddy.sh --domain tiyoujie.pxcore.com.cn --remove
+#   sudo ./apply-caddy.sh --domain ... --upstream ... --restart-container
+#
+# 注意：Caddyfile 是**单文件** bind mount，Docker 绑定的是 inode。
+# 本脚本用原地写入保留 inode；若历史上文件曾被 install/mv 替换过，
+# 容器会继续看到旧 inode，此时必须重启容器（--restart-container）才能生效。
 set -euo pipefail
 
 DOMAIN=""
@@ -26,6 +31,7 @@ CADDY_CONTAINER=""
 BACKUP_DIR="/opt/tiyoujie/backups/caddy"
 DRY_RUN=0
 REMOVE=0
+RESTART_CONTAINER=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="${SCRIPT_DIR}/caddy/tiyoujie.caddy.template"
 
@@ -57,6 +63,10 @@ while [ $# -gt 0 ]; do
 		BACKUP_DIR="${2:-}"
 		shift 2
 		;;
+	--restart-container)
+		RESTART_CONTAINER=1
+		shift
+		;;
 	--dry-run)
 		DRY_RUN=1
 		shift
@@ -66,7 +76,7 @@ while [ $# -gt 0 ]; do
 		shift
 		;;
 	-h | --help)
-		sed -n '2,22p' "$0"
+		sed -n '2,26p' "$0"
 		exit 0
 		;;
 	*) die "未知参数 $1" ;;
@@ -123,13 +133,6 @@ render_block() {
 	sed -e "s/__DOMAIN__/${DOMAIN}/g" -e "s/__UPSTREAM__/${UPSTREAM}/g" "$TEMPLATE"
 }
 
-# 在真实容器里校验：文件是 bind mount，改完立刻可见，且能拿到真实环境变量
-# （例如 {$GENERATION_API_DOMAIN}），单独起临时容器会因缺变量误报失败。
-validate_file() {
-	docker exec "$CADDY_CONTAINER" caddy validate \
-		--config "$CONTAINER_PATH" --adapter caddyfile >/dev/null 2>&1
-}
-
 reload_caddy() {
 	docker exec "$CADDY_CONTAINER" caddy reload \
 		--config "$CONTAINER_PATH" --adapter caddyfile >/dev/null 2>&1
@@ -171,17 +174,49 @@ BACKUP="${BACKUP_DIR}/Caddyfile.production.$(date -u +%Y%m%dT%H%M%SZ)"
 cp -a "$CADDYFILE" "$BACKUP"
 say "已备份原配置：$BACKUP"
 
-# 保留原文件权限再写入，避免容器内外权限不一致。
-install -m "$(stat -c '%a' "$BACKUP")" "$TMP" "$CADDYFILE"
+# 必须**原地写入**，不能 install/mv 替换文件：
+# Docker 的单文件 bind mount 绑定的是 inode，替换文件会生成新 inode，
+# 容器里仍然看到旧内容——此时语法校验能通过（校验读的是宿主路径），
+# 但 caddy reload 会返回 "config is unchanged"，站点根本不会生效。
+MODE="$(stat -c '%a' "$BACKUP")"
+OWNER="$(stat -c '%u:%g' "$BACKUP")"
+cat "$TMP" >"$CADDYFILE"
+chmod "$MODE" "$CADDYFILE"
+chown "$OWNER" "$CADDYFILE" 2>/dev/null || true
 
-if ! validate_file; then
-	cp -a "$BACKUP" "$CADDYFILE"
-	die "Caddy 语法校验失败，已自动还原 $CADDYFILE"
+restore_backup() {
+	cat "$BACKUP" >"$CADDYFILE"
+}
+
+container_hash() {
+	docker exec "$CADDY_CONTAINER" md5sum "$CONTAINER_PATH" 2>/dev/null | awk '{print $1}'
+}
+
+if [ "$(container_hash)" != "$(md5sum "$CADDYFILE" | awk '{print $1}')" ]; then
+	say "检测到容器内看到的仍是旧文件（单文件 bind mount 的 inode 未跟随）。"
+	if [ "$RESTART_CONTAINER" -eq 1 ]; then
+		say "按参数要求重启 ${CADDY_CONTAINER} 以重新挂载……"
+		docker restart "$CADDY_CONTAINER" >/dev/null
+		sleep 2
+	else
+		say "宿主文件已写入且校验通过，但需要让容器重新挂载才会生效："
+		say "  docker restart ${CADDY_CONTAINER}     # 或用 --restart-container 自动执行"
+		exit 1
+	fi
 fi
-say "语法校验通过（在真实容器内执行）。"
+
+# 用容器真实环境的变量在容器内校验（含 {$GENERATION_API_DOMAIN} 等）。
+if ! docker run --rm -e GENERATION_API_DOMAIN="${GENERATION_API_DOMAIN:-}" \
+	--add-host host.docker.internal:host-gateway \
+	-v "${CADDYFILE}:/etc/caddy/Caddyfile:ro" "${CADDY_IMAGE:-caddy:2.10-alpine}" \
+	caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+	restore_backup
+	die "Caddy 语法校验失败，已还原 $CADDYFILE"
+fi
+say "语法校验通过。"
 
 if ! reload_caddy; then
-	cp -a "$BACKUP" "$CADDYFILE"
+	restore_backup
 	reload_caddy || say "警告：回滚后的重载也失败了，请人工检查 docker logs ${CADDY_CONTAINER}"
 	die "重载失败，已还原 $CADDYFILE"
 fi
