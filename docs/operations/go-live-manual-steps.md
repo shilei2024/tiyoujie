@@ -201,7 +201,7 @@ openid，重置会让那个系统立刻登录失败。
 在服务器上执行下面这段，密钥通过交互式输入，**不会留在 shell 历史里**：
 
 ```bash
-cd /opt/tiyoujie
+cd /opt/tiyoujie/repo
 read -rsp 'AppSecret: ' S && echo && python3 - "$S" <<'PY'
 import sys, pathlib
 secret = sys.argv[1]
@@ -219,7 +219,18 @@ if not done:
 path.write_text('\n'.join(out) + '\n', encoding='utf-8')
 print('written')
 PY
-unset S && chmod 600 .env.prod && cd /opt/tiyoujie && docker compose -p tiyoujie --env-file .env.prod -f compose.yaml -f infra/deploy/compose.prod.yaml -f infra/deploy/compose.caddy.yaml up -d --wait api worker beat
+unset S
+chmod 600 .env.prod
+bash infra/deploy/verify-wechat.sh
+```
+
+注意：`WECHAT_APP_SECRET` 生效需要重启 API 进程，最后一步的校验脚本会告诉你
+是否还需要重启（它不自己做，避免在校验失败时先动线上）。需要重启时执行：
+
+```bash
+cd /opt/tiyoujie/repo && docker compose -p tiyoujie --env-file .env.prod \
+  -f compose.yaml -f infra/deploy/compose.prod.yaml \
+  up -d --wait --no-build api worker beat
 ```
 
 ### 3.4 为什么这一步不能省
@@ -230,7 +241,22 @@ unset S && chmod 600 .env.prod && cd /opt/tiyoujie && docker compose -p tiyoujie
 
 ### 3.5 验证方式
 
-配置完成后，以下接口无需登录即可访问：
+**第一步：证明密钥是真的**（会真的向微信换 token）：
+
+```bash
+cd /opt/tiyoujie/repo && bash infra/deploy/verify-wechat.sh
+```
+
+期望输出 `成功：已获取 access_token`。常见失败与含义：
+
+| errcode | 含义 |
+| --- | --- |
+| 40125 | 密钥无效，后台重置过，需同步最新值 |
+| 40013 | AppID 与后台不一致 |
+| 40164 | 服务器公网 IP 不在小程序后台 IP 白名单里 |
+| 连接超时 | 服务器 443 出网被拦，小程序登录同样会失败 |
+
+**第二步：确认线上已生效**（无需登录即可访问）：
 
 ```bash
 curl -s https://tiyoujie.pxcore.com.cn/api/v1/auth/capabilities/
