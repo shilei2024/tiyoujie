@@ -41,7 +41,7 @@ def configuration(appid, api_base, *, ui_only=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["build", "open"])
+    parser.add_argument("action", choices=["build", "open", "upload"])
     manifest = json.loads(
         (ROOT / "frontend/src/manifest.json").read_text(encoding="utf-8")
     )
@@ -55,6 +55,16 @@ def main():
         help="Compile UI with backend unavailable; keeps HTTPS and domain checks enabled",
     )
     parser.add_argument("--api-base", default=os.environ.get("VITE_API_BASE_URL", ""))
+    parser.add_argument(
+        "--version",
+        default="0.1.0",
+        help="Version shown in the WeChat console; required for upload",
+    )
+    parser.add_argument(
+        "--desc",
+        default="题有解 体验版",
+        help="Upload remark shown in the WeChat console",
+    )
     parser.add_argument(
         "--cli",
         type=Path,
@@ -108,6 +118,9 @@ def main():
         parser.error(
             "Provide --cli pointing to the installed Windows WeChat developer CLI"
         )
+    if args.action == "upload":
+        upload(parser, args, target)
+        return
     result = subprocess.run(
         [str(args.cli.resolve()), "open", "--project", str(target)],
         capture_output=True,
@@ -134,6 +147,62 @@ def main():
         )
         sys.exit(1)
     print(json.dumps({"status": "opened", "project": str(target)}, ensure_ascii=False))
+
+
+def upload(parser, args, target):
+    """上传开发版本（不发布、不提交审核，正式发布仍需人工在后台点）。
+
+    开发者工具必须先登录，否则 CLI 只会返回一句难以理解的错误，所以先问登录态。
+    """
+    login = subprocess.run(
+        [str(args.cli.resolve()), "islogin"],
+        capture_output=True,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if '"login":true' not in (login.stdout + login.stderr).replace(" ", ""):
+        parser.error(
+            "WeChat devtools is not logged in; open the IDE and scan the QR code first"
+        )
+    result = subprocess.run(
+        [
+            str(args.cli.resolve()),
+            "upload",
+            "--project",
+            str(target),
+            "-v",
+            args.version,
+            "-d",
+            args.desc,
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    output = result.stdout + result.stderr
+    if result.returncode or "[error]" in output:
+        print(
+            json.dumps(
+                {"status": "upload_failed", "message": output.strip()[-600:]},
+                ensure_ascii=False,
+            )
+        )
+        sys.exit(1)
+    print(
+        json.dumps(
+            {
+                "status": "uploaded",
+                "version": args.version,
+                "desc": args.desc,
+                "note": "Set it as the trial build in the WeChat console; nothing was released",
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 if __name__ == "__main__":
