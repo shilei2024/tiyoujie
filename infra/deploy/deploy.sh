@@ -101,7 +101,8 @@ DOCKER0_IP="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d
 [ -n "$DOCKER0_IP" ] || die "找不到 docker0 网卡，无法确定 API 绑定地址"
 [ "$DOCKER0_IP" = "$BIND_IP" ] ||
 	die "API_BIND_IP=${BIND_IP} 与当前 docker0=${DOCKER0_IP} 不一致；请执行 sed -i 's|^API_BIND_IP=.*|API_BIND_IP=${DOCKER0_IP}|' .env.prod 后重试"
-say "API 绑定：${BIND_IP}:${API_PORT}（仅 docker0，公网不可达）"
+DOMAIN="$(env_value DJANGO_ALLOWED_HOSTS | cut -d, -f1)"
+say "API 绑定：${BIND_IP}:${API_PORT}（仅 docker0，公网不可达），对外域名：${DOMAIN}"
 PREVIOUS_IMAGE="$(env_value API_IMAGE)"
 
 say "== 1/6 取代码 =="
@@ -184,13 +185,13 @@ say "== 6/6 启动应用并健康检查 =="
 "${COMPOSE[@]}" up -d --wait --no-build api worker beat
 
 for _ in $(seq "$HEALTH_TIMEOUT"); do
-	if curl -fsS "http://${BIND_IP}:${API_PORT}/api/v1/health/ready/" >/dev/null 2>&1; then
+	if curl -fsS -H "Host: ${DOMAIN}" -H "X-Forwarded-Proto: https" \
+		"http://${BIND_IP}:${API_PORT}/api/v1/health/ready/" >/dev/null 2>&1; then
 		trap - ERR
 		say ""
 		say "发布成功：${IMAGE}"
 		say "  镜像摘要：${IMAGE_ID}"
 		say "  就绪探针：http://${BIND_IP}:${API_PORT}/api/v1/health/ready/"
-		DOMAIN="$(env_value DJANGO_ALLOWED_HOSTS | cut -d, -f1)"
 		say "  对外域名：https://${DOMAIN}/api/v1/health/live/"
 		say "  回滚命令：./infra/deploy/deploy.sh --rollback"
 		if [ "$APPLY_CADDY" -eq 1 ]; then

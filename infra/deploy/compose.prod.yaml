@@ -77,6 +77,26 @@ services:
       - "-"
     volumes:
       - private_prod:/app/private
+    # 生产只允许真实域名（ALLOWED_HOSTS），且 SECURE_SSL_REDIRECT 已开启：
+    # 探针必须带真实 Host 与 X-Forwarded-Proto，否则会拿到 400 或 301，
+    # 容器永远不健康——这是本项目在真机上第一次发布时踩到的坑。
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os, urllib.request as u
+          host = os.environ["DJANGO_ALLOWED_HOSTS"].split(",")[0]
+          req = u.Request(
+              "http://127.0.0.1:8000/api/v1/health/ready/",
+              headers={"Host": host, "X-Forwarded-Proto": "https"},
+          )
+          u.urlopen(req, timeout=5)
+      interval: 10s
+      timeout: 6s
+      retries: 8
+      start_period: 20s
     mem_limit: 640m
     cpus: 1.5
 
