@@ -122,7 +122,7 @@ if [ "$ROLLBACK" -eq 1 ]; then
 	[ -n "$TARGET" ] || die "上一版镜像记录为空"
 	say "回滚到 ${TARGET}"
 	set_env_value API_IMAGE "$TARGET"
-	"${COMPOSE[@]}" up -d --wait api worker beat
+	"${COMPOSE[@]}" up -d --wait --no-build api worker beat
 	exit 0
 fi
 
@@ -151,11 +151,16 @@ set_env_value API_IMAGE "$IMAGE"
 "${COMPOSE[@]}" config --quiet || die "编排校验失败"
 
 restore_previous() {
-	if [ -n "$PREVIOUS_IMAGE" ]; then
-		say "回滚 API_IMAGE → ${PREVIOUS_IMAGE}"
-		set_env_value API_IMAGE "$PREVIOUS_IMAGE"
-		"${COMPOSE[@]}" up -d --wait api worker beat || true
+	if [ -z "$PREVIOUS_IMAGE" ]; then
+		return 0
 	fi
+	if ! docker image inspect "$PREVIOUS_IMAGE" >/dev/null 2>&1; then
+		say "上一版镜像 ${PREVIOUS_IMAGE} 不存在，跳过自动回滚（需人工处理）"
+		return 0
+	fi
+	say "回滚 API_IMAGE → ${PREVIOUS_IMAGE}"
+	set_env_value API_IMAGE "$PREVIOUS_IMAGE"
+	"${COMPOSE[@]}" up -d --wait --no-build api worker beat || true
 }
 trap 'restore_previous' ERR
 
@@ -176,7 +181,7 @@ say "== 5/6 迁移数据库 =="
 "${COMPOSE[@]}" run --rm --no-deps api python manage.py migrate --noinput
 
 say "== 6/6 启动应用并健康检查 =="
-"${COMPOSE[@]}" up -d --wait api worker beat
+"${COMPOSE[@]}" up -d --wait --no-build api worker beat
 
 for _ in $(seq "$HEALTH_TIMEOUT"); do
 	if curl -fsS "http://${BIND_IP}:${API_PORT}/api/v1/health/ready/" >/dev/null 2>&1; then

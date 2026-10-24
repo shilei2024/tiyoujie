@@ -25,6 +25,11 @@ services:
   api:
     <<: *prod-service
     image: ${API_IMAGE:?Set API_IMAGE to the reviewed image digest}
+    # 与 deploy.sh 的 --build-arg 保持一致：受限网络下不填镜像会构建失败。
+    build:
+      args:
+        PYPI_INDEX: ${PYPI_INDEX:-https://pypi.org/simple}
+        PYPI_FILES_HOST: ${PYPI_FILES_HOST:-}
     # !override 才是“替换列表”，直接写 ports 是追加。
     # 只绑 docker0，公网 IP 上不监听；容器与宿主机可用，外部不可达。
     ports: !override
@@ -116,9 +121,12 @@ services:
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Required}
       APP_DB_PASSWORD: ${DB_PASSWORD:?Required}
+      APP_DB_USER: ${DB_USER:?Required}
+      APP_DB_NAME: ${DB_NAME:?Required}
     volumes:
       - postgres_prod:/var/lib/postgresql
-      - ./infra/postgres/dev.sql:/docker-entrypoint-initdb.d/10-role.sql:ro
+      # 生产库名/角色来自 .env.prod，必须用参数化脚本（dev.sql 写死了 tiyoujie_dev）。
+      - ./infra/postgres/prod.sql:/docker-entrypoint-initdb.d/10-role.sql:ro
     # 与既有 mindfulpenpal postgres 共存，不宜占满内存。
     command:
       - postgres
