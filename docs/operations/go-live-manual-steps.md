@@ -249,6 +249,27 @@ curl -s https://tiyoujie.pxcore.com.cn/api/v1/auth/capabilities/
 
 ---
 
+## 第三步补充：服务器域名白名单（与 AppSecret 同一后台，必须做）
+
+小程序默认只允许访问白名单内的 https 域名，不加这一项，真机上所有请求都会被微信拦截，
+表现是「网络异常」且后端日志里什么都看不到。
+
+路径：**开发** → **开发管理** → **开发设置** → **服务器域名**
+
+| 位置 | 填写 |
+| --- | --- |
+| request 合法域名 | `https://tiyoujie.pxcore.com.cn` |
+| uploadFile 合法域名 | `https://tiyoujie.pxcore.com.cn` |
+| downloadFile 合法域名 | `https://tiyoujie.pxcore.com.cn` |
+
+注意事项：
+
+- 必须是 `https://` 开头，必须带完整域名，**不能带路径、不能带端口**（直接写
+  `https://tiyoujie.pxcore.com.cn`，不要写 `/api/v1`，也不要写 `:443`）
+- 一个月内修改次数有限（当前规则为每月若干次），一次填对
+- 该域名必须已备案（主域 `pxcore.com.cn` 已备案，子域直接可用）
+- 填完点「保存」，然后用开发者工具「详情 → 域名信息」确认已同步
+
 ## 三件事完成后，我这边会做什么
 
 按顺序执行，每步都有验证，任一步失败立即停止并回滚：
