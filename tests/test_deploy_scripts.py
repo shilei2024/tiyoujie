@@ -133,6 +133,40 @@ class DeployScriptOriginTests(unittest.TestCase):
         self.assertIn("代码来源", self.script)
 
 
+class BasePolicyBootstrapTests(unittest.TestCase):
+    """基础限额缺失会让创建家庭直接 503，部署必须自己补上。
+
+    这与上线前手工步骤的区别：它不能靠人记得，否则第一个真机用户就撞上。
+    """
+
+    def setUp(self):
+        self.script = DEPLOY.read_text(encoding="utf-8")
+
+    def test_deploy_bootstraps_base_policy(self):
+        self.assertIn("ensure_base_policy", self.script)
+
+    def test_bootstrap_runs_after_migrations(self):
+        migrate = self.script.index("manage.py migrate")
+        ensure = self.script.index("ensure_base_policy")
+        self.assertLess(migrate, ensure, "基础限额必须在迁移之后初始化")
+
+    def test_bootstrap_defaults_are_valid_integers(self):
+        # 空值必须落到合法整数，否则 argparse 的 type=int 会直接让发布失败。
+        for key in ("BASIC_CHILD_LIMIT", "MAX_FAMILIES"):
+            line = next(
+                item
+                for item in self.script.splitlines()
+                if key in item and "env_value" in item
+            )
+            self.assertIn("printf 3", line)
+
+    def test_command_file_exists(self):
+        command = (
+            ROOT / "backend/apps/entitlements/management/commands/ensure_base_policy.py"
+        )
+        self.assertTrue(command.is_file())
+
+
 class ManualPathsTests(unittest.TestCase):
     """手册里的命令必须与实际目录一致，抄下来就能跑。"""
 

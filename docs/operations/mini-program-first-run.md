@@ -34,6 +34,7 @@ uni.login() → code → POST /api/v1/auth/wechat-login/ → 后端用 code 换 
 | 提示「网络异常」，且服务端日志**一条请求都没有** | 服务器域名白名单没配 | 后台把 `https://tiyoujie.pxcore.com.cn` 加进 request / uploadFile / downloadFile |
 | 返回 `WECHAT_NOT_CONFIGURED`（503） | 密钥为空 | 跑 `infra/deploy/rotate-wechat-credentials.sh` |
 | 返回 `WECHAT_CODE_INVALID`（400） | 后端已正确调用微信，但 code 过期/被用过 | 重新点一次登录；持续出现需查 AppID 与 Secret 是否同一小程序 |
+| 创建家庭弹「请先由管理员配置家庭与档案的基础限额」 | 库里的基础限额（`ResourcePolicy`）缺失，`SITE_NOT_CONFIGURED` | 正常发布不会出现（`deploy.sh` 会补齐）；手工修：`manage.py configure_limits --basic-children 3 --max-families 3 --reason "..."` |
 
 「网络异常 + 服务端零日志」这一组合必须先怀疑白名单，而不是后端——
 白名单没配时请求根本没离开手机，服务端不可能有记录。

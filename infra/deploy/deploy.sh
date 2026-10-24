@@ -193,8 +193,14 @@ if [ -n "$(docker compose -p tiyoujie ps --status running --format '{{.Service}}
 	fi
 fi
 
-say "== 5/6 迁移数据库 =="
+say "== 5/6 迁移数据库并确保基础限额 =="
 "${COMPOSE[@]}" run --rm --no-deps api python manage.py migrate --noinput
+# 基础限额是核心路径的前置：创建家庭第一句就读它，缺失时线上直接 503。
+# 只在缺失时用默认值初始化，已存在则原样保留——不覆盖任何人工调整。
+"${COMPOSE[@]}" run --rm --no-deps api python manage.py ensure_base_policy \
+	--basic-children "$(env_value BASIC_CHILD_LIMIT | grep -E '^[0-9]+$' || printf 3)" \
+	--max-families "$(env_value MAX_FAMILIES | grep -E '^[0-9]+$' || printf 3)" \
+	--reason "deploy.sh bootstrap at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 say "== 6/6 启动应用并健康检查 =="
 "${COMPOSE[@]}" up -d --wait --no-build api worker beat

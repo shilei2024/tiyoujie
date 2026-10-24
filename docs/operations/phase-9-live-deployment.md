@@ -95,6 +95,19 @@ Caddy 配置是单文件 bind mount：
 
 第 7 项最危险：它让“全绿”失去意义。发现方式是新写的 3 个用例既没有让测试数变化、也没有报错。
 
+### 4.2 首个真机操作暴露的第三个流程缺陷：基础限额从未初始化
+
+| # | 现象 | 根因 | 修复 |
+| --- | --- | --- | --- |
+| 8 | 真机点「创建家庭」弹「请先由管理员配置家庭与档案的基础限额」，HTTP 503 `SITE_NOT_CONFIGURED` | `create_family()` 第一句就读 `ResourcePolicy(pk="base")` 的 `max_families`，而生产库里这张表是 **0 行**。仓库有 `configure_limits` 命令，本地手册也写了这一步，但 **`deploy.sh` 从未调用**，于是空库上线 | 新增幂等命令 `ensure_base_policy`（仅缺失时按 `.env.prod` 的 `BASIC_CHILD_LIMIT` / `MAX_FAMILIES` 初始化，默认 3/3；已存在则原样保留并打印现值），`deploy.sh` 在迁移之后必定执行；审计事件记 `base_policy_initialized` |
+
+这一项和故障 6、7 同源：**设计正确、文档也写了，但没人执行的步骤等于不存在**。
+区别是它更晚才暴露——必须有一个真人点下「创建家庭」才会触发，而此前的自动化（健康探针、能力声明、伪造 code）都碰不到这条路径。
+`PromotionCampaign` 保持不自动创建：基础限额是产品底座，活动是商业承诺，两者不能混为一谈。
+
+生产已于 2026-10-24 用 `configure_limits --basic-children 3 --max-families 3` 显式初始化，
+审计记录 `base_policy_configured`，理由写明真实原因。
+
 ---
 
 ## 5. 线上验收（全部真实执行）
