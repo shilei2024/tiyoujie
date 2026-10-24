@@ -86,6 +86,15 @@ Caddy 配置是单文件 bind mount：
 攻击者打满一个桶即可让全体用户无法登录。现改为仅在部署环境信任
 `X-Forwarded-For` 且只取最后一跳。
 
+### 4.1 运营阶段暴露的两个流程缺陷（不影响线上功能，但会骗过验收）
+
+| # | 现象 | 根因 | 修复 |
+| --- | --- | --- | --- |
+| 6 | `deploy.sh --ref main` 打印“发布成功”，但服务器上的版本号没变，新提交的脚本找不到 | 此前因 GitHub 直连超时，服务器 `origin` 被改成离线 `git bundle` 文件。`git fetch` 读的还是那个静态文件，永远返回旧提交 | 服务器 `origin` 改回 `https://github.com/shilei2024/tiyoujie.git`（实测可直连）；`deploy.sh` 检测到 `origin` 是本地路径时打印警告与该文件修改时间，并在每次拉取后打印“代码来源” |
+| 7 | 新增的后端测试“没生效”：测试数不变，改动完全没被测到 | `scripts/project.py test` 跑在镜像里，`test` 子命令不会重建镜像，所以验证的是上一次构建的旧代码 | `test` 子命令先执行 `compose build api` 再跑用例；CI 本来就是 build→test，语义一致 |
+
+第 7 项最危险：它让“全绿”失去意义。发现方式是新写的 3 个用例既没有让测试数变化、也没有报错。
+
 ---
 
 ## 5. 线上验收（全部真实执行）
@@ -113,7 +122,7 @@ Caddy 配置是单文件 bind mount：
 | 小程序「服务器域名」白名单 | **BLOCKED** | 需在微信后台把 `https://tiyoujie.pxcore.com.cn` 加入 request 合法域名，否则真机请求被拦 |
 | 小程序体验版/正式版上传 | **NOT TESTED** | 需 AppSecret 到位后由开发者工具上传并真机验证 |
 | 真机端到端登录 | **NOT TESTED** | 依赖上面两项 |
-| 隐私政策与监护人告知 | **BLOCKED** | 版本 `2026-10-v1` 已内置，文本内容待确认 |
+| 隐私政策与监护人告知 | **BLOCKED** | 版本 `2026-10-v1` 已内置；[文本已按实际数据流备好](../legal/privacy-notice.md)，仅缺运营主体名称/联系邮箱/生效日期 |
 | 平台 AI / OCR | 保持关闭 | 无合同、凭证与授权样本 |
 | 授权题库 | 保持关闭 | 无授权证明与审核人 |
 | 异机 / 生产规模备份恢复 | **NOT TESTED** | 本机隔离演练已通过（Phase 7） |
@@ -127,8 +136,11 @@ Caddy 配置是单文件 bind mount：
 
 ```bash
 # 发布（服务器上，root）
+cd /opt/tiyoujie/repo && ./infra/deploy/deploy.sh --ref main       # 从 GitHub 拉取并发布
 cd /opt/tiyoujie/repo && ./infra/deploy/deploy.sh --skip-pull      # 代码已投放时
-cd /opt/tiyoujie/repo && ./infra/deploy/deploy.sh --ref main       # 从 GitHub 拉取（本机直连较慢）
+
+# AppSecret 写入后校验（真向微信换 token，失败按 errcode 给原因）
+cd /opt/tiyoujie/repo && bash infra/deploy/verify-wechat.sh
 
 # 回滚到上一版镜像
 ./infra/deploy/deploy.sh --rollback

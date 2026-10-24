@@ -73,5 +73,24 @@ class ManualPathsTests(unittest.TestCase):
         self.assertIsNone(re.search(r"compose\.caddy\.yaml", self.text))
 
 
+class PrivacyNoticeVersionTests(unittest.TestCase):
+    """监护人告知版本号必须与代码里判定同意的版本一致。
+
+    版本漂移会让用户在旧文本下"同意"，而服务端记录的是新版本号。
+    """
+
+    def test_notice_version_matches_settings(self):
+        settings_text = (ROOT / "backend/config/settings/base.py").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(
+            r'"GUARDIAN_NOTICE_VERSION":\s*"([0-9A-Za-z._-]+)"', settings_text
+        )
+        self.assertIsNotNone(match, "settings 中找不到 GUARDIAN_NOTICE_VERSION")
+        version = match.group(1)
+        notice = (ROOT / "docs/legal/privacy-notice.md").read_text(encoding="utf-8")
+        self.assertIn(version, notice)
+
+
 if __name__ == "__main__":
     unittest.main()
