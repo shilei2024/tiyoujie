@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/dcloudio/uni-preset-vue",
+  "branch": "vite-ts",
+  "commit": "e5a5f0539416a0f012c919cc77949d140542a367",
+  "checked_at": "2026-10-22",
+  "retained": "Vue 3 / TypeScript / uni-app layout and scripts; H5 and mp-weixin only"
+}

@@ -1,0 +1,5 @@
+# Explicit local opt-in only; deployment settings reject this flag.
+services:
+  api:
+    environment:
+      DEV_LOGIN_ENABLED: '1'

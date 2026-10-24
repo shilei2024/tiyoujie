@@ -1,0 +1,45 @@
+# 由 infra/deploy/apply-caddy.sh 渲染后追加到主机 Caddyfile，不要直接手改生成结果。
+#
+# 两条硬约束：
+# 1. 站点地址必须写完整域名（不要写 :443），Caddy 才会自动申请证书；
+# 2. 上游必须是回环地址 —— 应用端口没有防火墙保护，只允许本机代理访问。
+
+__DOMAIN__ {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	# 与后端 MAX_REQUEST_BYTES 对齐，过大请求在边缘就拒绝，不打到应用。
+	request_body {
+		max_size 9MB
+	}
+
+	# 健康检查不加访问日志，避免探针刷日志。
+	@health path /api/v1/health/*
+	log_skip @health
+
+	reverse_proxy 127.0.0.1:__UPSTREAM__ {
+		header_up X-Forwarded-Proto https
+		header_up X-Real-IP {remote_host}
+		transport http {
+			read_timeout 30s
+			write_timeout 30s
+			dial_timeout 5s
+		}
+	}
+
+	log {
+		output file /var/log/caddy/__DOMAIN__.log {
+			roll_size 20MiB
+			roll_keep 5
+			roll_keep_for 168h
+		}
+		format json
+	}
+}

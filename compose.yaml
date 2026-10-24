@@ -1,0 +1,187 @@
+name: tiyoujie-local
+
+x-app: &app
+  image: tiyoujie-api:phase7
+  build:
+    context: .
+    dockerfile: infra/Dockerfile
+  init: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs: [/tmp]
+  mem_limit: 512m
+  cpus: 1
+
+x-dev-env: &dev-env
+  APP_ENV: dev
+  DJANGO_SETTINGS_MODULE: config.settings.dev
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Run scripts/bootstrap.py first}
+  # 末位真实域名仅用于本机用生产的 Caddy 配置做边缘层演练，不对公网暴露。
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,api,tiyoujie.pxcore.com.cn
+  DB_HOST: postgres
+  DB_NAME: tiyoujie_dev
+  DB_USER: tiyoujie_dev
+  DB_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+  REDIS_URL: redis://redis:6379/0
+  PRIVATE_STORAGE_ROOT: /app/private
+  CREDENTIAL_KEYS_JSON: ${CREDENTIAL_KEYS_JSON:-}
+  CREDENTIAL_ACTIVE_KEY_VERSION: ${CREDENTIAL_ACTIVE_KEY_VERSION:-}
+  WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+  WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+  OCR_OUTBOUND_ENABLED: ${OCR_OUTBOUND_ENABLED:-0}
+  AI_ANALYSIS_ENABLED: ${AI_ANALYSIS_ENABLED:-0}
+  PLATFORM_AI_ENABLED: ${PLATFORM_AI_ENABLED:-0}
+  PLATFORM_OCR_CONFIGURED_PROVIDERS: ${PLATFORM_OCR_CONFIGURED_PROVIDERS:-}
+
+x-test-env: &test-env
+  APP_ENV: test
+  DJANGO_SETTINGS_MODULE: config.settings.test
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Run scripts/bootstrap.py first}
+  DJANGO_ALLOWED_HOSTS: testserver,localhost,127.0.0.1
+  DB_HOST: postgres-test
+  DB_NAME: tiyoujie_test
+  DB_USER: tiyoujie_test
+  DB_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+  REDIS_URL: redis://redis-test:6379/0
+  PRIVATE_STORAGE_ROOT: /app/private
+  ISOLATED_TEST_RUN: '1'
+
+services:
+  postgres:
+    image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+      APP_DB_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+    volumes:
+      - postgres_dev:/var/lib/postgresql
+      - ./infra/postgres/dev.sql:/docker-entrypoint-initdb.d/10-role.sql:ro
+    networks: [dev]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d postgres']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+
+  redis:
+    image: redis:8.2.10@sha256:e5f23377739f95a2f530b9c99f93accb4f634577f09d00a7d8e0638f2fdf69e0
+    command: [redis-server, --appendonly, 'yes', --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    volumes: [redis_dev:/data]
+    networks: [dev]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 192m
+
+  api:
+    <<: *app
+    environment: *dev-env
+    command: [gunicorn, config.wsgi:application, --bind, '0.0.0.0:8000', --workers, '2', --timeout, '15', --error-logfile, '-']
+    ports: ['127.0.0.1:18000:8000']
+    volumes: [private_dev:/app/private]
+    networks: [dev, edge]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready/', timeout=5)"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    <<: *app
+    environment:
+      <<: *dev-env
+      PLATFORM_OCR_KEY_DEEPSEEK: ${PLATFORM_OCR_KEY_DEEPSEEK:-}
+      PLATFORM_OCR_KEY_KIMI: ${PLATFORM_OCR_KEY_KIMI:-}
+    volumes: [private_dev:/app/private]
+    command: [celery, -A, config.celery:app, worker, --loglevel=WARNING, --concurrency=1, --without-gossip, --without-mingle]
+    networks: [dev]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'celery -A config.celery:app inspect ping --destination celery@$$HOSTNAME --timeout 3 | grep -q pong']
+      interval: 15s
+      timeout: 8s
+      retries: 5
+
+  beat:
+    <<: *app
+    environment: *dev-env
+    command: [celery, -A, config.celery:app, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+    networks: [dev]
+    depends_on:
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+
+  postgres-test:
+    profiles: [test]
+    image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+    environment:
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+      APP_DB_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Run scripts/bootstrap.py first}
+    tmpfs: [/var/lib/postgresql]
+    volumes: [./infra/postgres/test.sql:/docker-entrypoint-initdb.d/10-role.sql:ro]
+    networks: [test]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d postgres']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+
+  redis-test:
+    profiles: [test]
+    image: redis:8.2.10@sha256:e5f23377739f95a2f530b9c99f93accb4f634577f09d00a7d8e0638f2fdf69e0
+    command: [redis-server, --save, '', --appendonly, 'no']
+    networks: [test]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 128m
+
+  worker-test:
+    <<: *app
+    volumes: [private_test:/app/private]
+    profiles: [test]
+    environment: *test-env
+    command: [celery, -A, config.celery:app, worker, --loglevel=WARNING, --concurrency=1, --without-gossip, --without-mingle]
+    networks: [test]
+    depends_on:
+      postgres-test: {condition: service_healthy}
+      redis-test: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'celery -A config.celery:app inspect ping --destination celery@$$HOSTNAME --timeout 3 | grep -q pong']
+      interval: 5s
+      timeout: 8s
+      retries: 12
+
+  tests:
+    <<: *app
+    volumes: [private_test:/app/private]
+    profiles: [test]
+    environment: *test-env
+    command: [python, manage.py, test, --noinput, --verbosity=2]
+    networks: [test]
+    depends_on:
+      postgres-test: {condition: service_healthy}
+      redis-test: {condition: service_healthy}
+      worker-test: {condition: service_healthy}
+
+networks:
+  edge: {}
+  dev: {internal: true}
+  test: {internal: true}
+volumes:
+  postgres_dev:
+  redis_dev:
+  private_dev:
+  private_test:

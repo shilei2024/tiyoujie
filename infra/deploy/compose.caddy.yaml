@@ -1,0 +1,19 @@
+# 覆盖层：主机已有 Caddy 占用 80/443 时使用（本次 pxcore.com.cn 主机即此情况）。
+# TLS 证书由 Caddy 自动向 Let's Encrypt 申请与续期，我方只暴露回环端口。
+#
+# 用法：
+#   docker compose -f compose.yaml -f infra/deploy/compose.prod.yaml \
+#     -f infra/deploy/compose.caddy.yaml --env-file .env.prod up -d
+#
+# 该覆盖层做了三件事：
+# 1. api 只绑定 127.0.0.1:${API_HOST_PORT}，公网无法绕过 Caddy 直连；
+# 2. 关闭内置 nginx（端口已被主机 Caddy 占用，方案见 compose.prod.yaml 的独立部署形态）；
+# 3. 不加任何 TLS 端口，证书与 HSTS 由 Caddy 负责。
+
+services:
+  api:
+    ports: !override
+      - "127.0.0.1:${API_HOST_PORT:-18010}:8000"
+
+  nginx:
+    profiles: ["standalone"]

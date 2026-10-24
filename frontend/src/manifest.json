@@ -1,0 +1,15 @@
+{
+  "name": "题有解",
+  "appid": "",
+  "description": "数学错题管理与智能复习",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "vueVersion": "3",
+  "uniStatistics": { "enable": false },
+  "h5": { "router": { "mode": "hash" } },
+  "mp-weixin": {
+    "appid": "wx38dee0ea03214271",
+    "setting": { "urlCheck": true },
+    "usingComponents": true
+  }
+}

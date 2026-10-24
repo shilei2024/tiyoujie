@@ -1,0 +1,21 @@
+repos:
+  - repo: local
+    hooks:
+      - id: python-quality
+        name: Python static checks
+        language: system
+        entry: uv run --project backend ruff check backend scripts
+        pass_filenames: false
+        types: [python]
+      - id: python-format
+        name: Python format check
+        language: system
+        entry: uv run --project backend ruff format --check backend scripts
+        pass_filenames: false
+        types: [python]
+      - id: repository-hygiene
+        name: Source and documentation hygiene
+        language: system
+        entry: python scripts/check_repository.py
+        pass_filenames: false
+        always_run: true

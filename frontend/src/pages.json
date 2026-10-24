@@ -1,0 +1,69 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "题有解"
+      }
+    },
+    {
+      "path": "pages/problems/index",
+      "style": {
+        "navigationBarTitleText": "我的错题本"
+      }
+    },
+    {
+      "path": "pages/problems/detail",
+      "style": {
+        "navigationBarTitleText": "错题校对"
+      }
+    },
+    {
+      "path": "pages/analysis/index",
+      "style": {
+        "navigationBarTitleText": "分析与提示"
+      }
+    },
+    {
+      "path": "pages/similar/index",
+      "style": {
+        "navigationBarTitleText": "同类题与变式"
+      }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "AI 设置"
+      }
+    },
+    {
+      "path": "pages/benefits/index",
+      "style": {
+        "navigationBarTitleText": "家庭免费权益"
+      }
+    },
+    {
+      "path": "pages/practice/index",
+      "style": {
+        "navigationBarTitleText": "今日复习"
+      }
+    },
+    {
+      "path": "pages/worksheets/index",
+      "style": {
+        "navigationBarTitleText": "练习题单"
+      }
+    },
+    {
+      "path": "pages/worksheets/detail",
+      "style": {
+        "navigationBarTitleText": "题单练习"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#f6f6f1",
+    "backgroundColor": "#f6f6f1"
+  }
+}

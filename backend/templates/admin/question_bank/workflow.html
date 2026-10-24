@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>导入上限为 20 题、48,000 字符。请先维护知识点字典和来源，再预览导入。重复题干会跳过；答案冲突应在题目编辑页更正，随后重新核验和审核。</p>
+<p>来源审核须核对权利凭据、使用范围、署名与有效期。机器只核验结构化算式；发布前仍需人工核对题干与算式的对应关系及解析。详情见 docs/operations/phase-5-operations.md。</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<input type="submit" value="执行所选操作"></form>
+{% if preview_rows %}
+<h2>导入预览（尚未入库）</h2>
+<table><thead><tr><th>行</th><th>题干</th><th>重复</th><th>与已有答案冲突</th><th>数学检查</th></tr></thead><tbody>
+{% for row in preview_rows %}<tr><td>{{ row.row }}</td><td>{{ row.text }}</td><td>{{ row.duplicate|yesno:"是,否" }}</td><td>{{ row.answer_conflict|yesno:"是,否" }}</td><td>{{ row.math_check.result }} · {{ row.math_check.code }}</td></tr>{% endfor %}
+</tbody></table>
+<form method="post">{% csrf_token %}<input type="hidden" name="operation" value="commit"><input type="hidden" name="payload" value="{{ commit_payload }}"><input type="submit" value="确认导入本次预览（全部进入待审核）"></form>
+{% endif %}
+{% if result %}<h2>操作结果</h2><pre style="white-space:pre-wrap;overflow-wrap:anywhere">{{ result }}</pre>{% endif %}
+{% endblock %}
