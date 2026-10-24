@@ -173,7 +173,9 @@ grep -Ei '^\s*(PubkeyAuthentication|PasswordAuthentication)' /etc/ssh/sshd_confi
 1. 用**小程序管理员**的微信扫码登录 <https://mp.weixin.qq.com/>
 2. 左侧菜单 **开发** → **开发管理**（部分版本叫"开发"→"开发设置"）
 3. 找到 **开发者 ID** 区块，里面有：
-   - **AppID(小程序 ID)**：应为 `wx38dee0ea03214271`（与代码中 `frontend/src/manifest.json` 一致）
+   - **AppID(小程序 ID)**：以该后台显示为准；仓库里不再写死 AppID，
+     构建时通过 `--appid` 或 `WECHAT_APP_ID` 传入，服务器上以 `.env.prod` 的值为准
+     （当前值可用 `grep WECHAT_APP_ID /opt/tiyoujie/repo/.env.prod` 查）
    - **AppSecret(小程序密钥)**：显示为 `********************************`
 4. 点右侧 **重置**（首次为"生成"）
 5. 按提示完成管理员扫码 + 手机短信/邮箱验证
@@ -181,7 +183,7 @@ grep -Ei '^\s*(PubkeyAuthentication|PasswordAuthentication)' /etc/ssh/sshd_confi
 
 ### 3.2 重要风险：确认没有别人在用这个 AppSecret
 
-**重置后旧密钥立即失效。** 如果 `wx38dee0ea03214271` 目前已经有线上后端在用它换取
+**重置后旧密钥立即失效。** 如果这个小程序 AppID 目前已经有线上后端在用它换取
 openid，重置会让那个系统立刻登录失败。
 
 上线前请确认：
