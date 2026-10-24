@@ -132,6 +132,9 @@ def main():
                     *command,
                 )
         case "test":
+            # 测试跑在镜像里，不是源码目录。不先构建就会拿旧镜像验证新代码，
+            # 结果是全绿但改的东西根本没被测到。
+            run(*COMPOSE, "build", "api")
             try:
                 run(
                     *COMPOSE,

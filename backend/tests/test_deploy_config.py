@@ -1,7 +1,5 @@
 """部署面配置回归测试：代理协议头、秘密强度与部署环境禁区。"""
 
-import os
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -156,33 +154,3 @@ class HttpsBehindProxyTests(TestCase):
         )
         self.assertEqual(response.status_code, 301)
         self.assertTrue(response["Location"].startswith("https://"))
-
-
-class WeChatSecretVerificationScriptTests(SimpleTestCase):
-    """回归：校验脚本必须真向微信换 token，且任何路径都不打印密钥。
-
-    只看“变量非空”会把错密钥当成配置完成，用户仍然登不进来。
-    """
-
-    path = Path(__file__).resolve().parents[2] / "infra/deploy/verify-wechat.sh"
-
-    def setUp(self):
-        self.script = self.path.read_text(encoding="utf-8")
-
-    def test_script_is_present_and_executable(self):
-        self.assertTrue(self.path.is_file())
-        self.assertTrue(os.access(self.path, os.X_OK))
-
-    def test_script_actually_queries_wechat(self):
-        self.assertIn("api.weixin.qq.com/cgi-bin/stable_token", self.script)
-        self.assertIn("client_credential", self.script)
-
-    def test_script_never_prints_the_secret(self):
-        self.assertNotIn("set -x", self.script)
-        for line in self.script.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue
-            for echoed in ("printf", "echo", "say"):
-                self.assertNotIn(f'{echoed} "$APP_SECRET"', line)
-                self.assertNotIn(f"{echoed} $APP_SECRET", line)

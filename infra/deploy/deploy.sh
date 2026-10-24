@@ -106,12 +106,27 @@ say "API 绑定：${BIND_IP}:${API_PORT}（仅 docker0，公网不可达），�
 PREVIOUS_IMAGE="$(env_value API_IMAGE)"
 
 say "== 1/6 取代码 =="
+# 曾用离线 bundle 投递代码：origin 若仍指向本地路径，发布会静默复用旧内容，
+# 表面上"发布成功"而版本号没变。这里必须把这件事说出来。
+ORIGIN_URL="$(git remote get-url origin 2>/dev/null || true)"
+case "$ORIGIN_URL" in
+https://* | http://* | ssh://* | git@*) : ;;
+*)
+	if [ -n "$ORIGIN_URL" ] && [ -e "$ORIGIN_URL" ]; then
+		say "警告：origin 指向本地路径 ${ORIGIN_URL}（最后修改 $(date -r "$ORIGIN_URL" '+%F %T'))。"
+		say "      这是离线 bundle，内容不会自动更新；确认它是当前代码，否则本次发布用的是旧版本。"
+	else
+		say "警告：origin 地址为 ${ORIGIN_URL:-空}，无法确认代码来源是否为最新。"
+	fi
+	;;
+esac
 if [ "$SKIP_PULL" -eq 1 ]; then
 	say "跳过拉取，使用当前工作区。"
 else
 	git fetch --prune --depth=1 origin "$REF"
 	git checkout -q --detach FETCH_HEAD
 	say "已切换到 $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
+	say "  代码来源：${ORIGIN_URL}"
 fi
 SHA="$(git rev-parse --short HEAD)"
 IMAGE="tiyoujie-api:${SHA}"
