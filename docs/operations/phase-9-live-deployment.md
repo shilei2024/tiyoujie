@@ -111,6 +111,9 @@ Caddy 配置是单文件 bind mount：
 | 其他站点回归 | `api.pxcore.com.cn` 404（与部署前一致）、`mindfulpenpal.com` 200、`www.mindfulpenpal.com` 301 |
 | 容器资源 | api 131 MB / worker 104 MB / beat 73 MB / pg 54 MB / redis 7 MB，合计约 369 MB |
 | `check --deploy` | 0 issue |
+| 登录接口限流 | 连续 21 次 `POST /auth/wechat-login/` 后返回 `429 RATE_LIMITED`，错误体含 `request_id`；按真实客户端 IP 计桶（Caddy 覆盖 `X-Forwarded-For`，后端取末跳） |
+| 后台登录限流 | `GET /admin/login/` 200；`POST` 第 1–10 次为 CSRF 校验的 403，第 11 次 429；Redis 键 `limit:prod:admin_login:*` 计数与响应一致 |
+| 时区 | 容器系统时区 UTC，Django `TIME_ZONE=UTC`；复习日历日单独用 `PRACTICE_TIME_ZONE=Asia/Shanghai`，不依赖主机时区 |
 
 ---
 
