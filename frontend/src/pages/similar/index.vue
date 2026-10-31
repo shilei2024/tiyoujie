@@ -166,11 +166,7 @@ onHide(() => {
       ><text class="badge">来源可追溯</text></view
     >
     <view v-if="problem?.current_text" class="panel">
-      <text class="eyebrow">从这道错题出发</text
-      ><text class="question">{{ problem.current_text.text }}</text>
-      <text class="note"
-        >优先查找授权有效、审核通过的题目。匹配理由用于说明检索依据。</text
-      >
+      <text class="question">{{ problem.current_text.text }}</text>
     </view>
     <view class="panel">
       <text class="section-title">找准下一道题</text>
@@ -232,10 +228,7 @@ onHide(() => {
         @change="intent = Number($event.detail.value)"
         ><view class="picker-field">{{ intents[intent] }} ▾</view></picker
       >
-      <text class="note"
-        >当前提供有理数算式的规则变式，不调用
-        AI、不消耗体验点。生成结果只保存为私人草稿，需核对题意、单位与解析。</text
-      >
+      <text class="note">规则变式 · 不调用 AI</text>
     </view>
     <view v-for="item in items" :key="item.id" class="panel">
       <view class="toolbar"
@@ -289,10 +282,8 @@ onHide(() => {
     </view>
     <view class="panel">
       <text class="section-title">变式草稿</text
-      ><text class="note">草稿未通过发布审核，不能作为已验证题使用。</text>
-      <text v-if="!drafts.length" class="note"
-        >暂无草稿。找到合适的题库题目后，可选择方向生成。</text
-      >
+      ><text class="note">草稿未通过发布审核</text>
+      <text v-if="!drafts.length" class="note">暂无草稿</text>
       <view v-for="draft in drafts" :key="draft.id" class="draft">
         <text class="badge">规则生成 · 待人工核验</text>
         <text v-if="draft.stale" class="note">关联的是原题的历史版本。</text>

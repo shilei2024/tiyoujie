@@ -565,9 +565,7 @@ async function deleteAccount() {
       >
       <view class="panel">
         <text class="section-title">家庭协作</text
-        ><text class="note"
-          >邀请仅授予指定孩子的访问范围。邀请码限时、单次使用，请只交给你认可的人。</text
-        >
+        ><text class="note">邀请码限时、单次使用</text>
         <view v-if="owner && children.length" class="inset">
           <picker
             :range="children"

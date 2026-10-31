@@ -653,11 +653,7 @@ async function remove() {
                 @click="removeImage"
               >
                 删除选中图片</button
-              ><text class="note"
-                >上传前请裁去姓名、学校、班级与条码。仅接收单帧
-                JPEG/PNG/WebP，单张不超过 8 MB、1200
-                万像素；服务器会去除元数据。</text
-              ><button
+              ><text class="note">裁去姓名/学校/条码；单帧 JPEG/PNG/WebP ≤8MB</text><button
                 class="secondary"
                 :disabled="busy || problem.assets.length >= 8"
                 @click="chooseImage"
@@ -673,10 +669,7 @@ async function remove() {
               mode="widthFix"
               class="problem-image"
             /><text class="note"
-              >原图 {{ local.width }} ×
-              {{
-                local.height
-              }}。坐标从左上角开始，单位为像素；选择需要保留的题目区域。</text
+              >原图 {{ local.width }} × {{ local.height }}，坐标单位像素</text
             >
             <view class="crop-grid"
               ><view
@@ -745,7 +738,7 @@ async function remove() {
           <view v-if="guardian && selectedAsset" class="panel"
             ><text class="section-title">裁剪与手动分题</text
             ><text class="note"
-              >在所选图片内指定矩形，裁剪会创建新图。多个区域可分成独立错题，原图继续保留。</text
+              >裁剪创建新图，原图保留</text
             >
             <view class="crop-grid"
               ><view
@@ -825,9 +818,7 @@ async function remove() {
               ><text class="badge">{{
                 problem.current_text ? "题干已人工确认" : "待核对"
               }}</text></view
-            ><text class="note"
-              >保留分数、根号、上下标与负号。确认题干不代表答案已经通过数学验证。</text
-            >
+            ><text class="note">保留分数、根号、上下标与负号</text>
             <textarea
               v-model="text"
               class="editor"
@@ -912,11 +903,9 @@ async function remove() {
           <view v-if="guardian" class="panel"
             ><text class="section-title">OCR 识别</text
             ><text class="note"
-              >只转录选中的题目图片，不自动求解或替你确认。识别能力尚未通过真实样本验收。</text
+              >只转录所选图片，不自动求解</text
             >
-            <text v-if="!outbound || !models.length" class="feedback"
-              >当前 OCR 尚未开放或未配置可用模型。你可以继续手动录入。</text
-            >
+            <text v-if="!outbound || !models.length" class="feedback">OCR 尚未开放</text>
             <template v-else
               ><picker
                 :range="models"
@@ -1039,9 +1028,7 @@ async function remove() {
           </view>
           <view class="panel"
             ><text class="section-title">整理错题</text
-            ><text class="note"
-              >来源、章节与知识点由你填写；当前没有自动分类。</text
-            ><input
+            ><text class="note">来源/章节/知识点由你填写</text><input
               v-model="source"
               class="input"
               aria-label="题目来源"

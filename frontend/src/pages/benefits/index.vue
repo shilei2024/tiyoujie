@@ -101,9 +101,7 @@ function back() {
       ><text class="heading accent"
         >{{ limit === null ? "—" : limit }}
         <text class="small muted">个孩子档案</text></text
-      ><text class="note"
-        >到期后按基础额度限制新增，已经建立的学习资料继续保留。功能是否开放以实际页面为准。</text
-      ></view
+      ><text class="note">到期后按基础额度限制新增</text></view
     >
     <view class="panel"
       ><text class="section-title">功能体验记录</text
@@ -142,11 +140,7 @@ function back() {
     </view>
     <view class="panel"
       ><text class="section-title">费用说明</text
-      ><text class="note"
-        >这里的权益是平台功能权限，AI
-        服务当前未开放。后续平台体验将有独立调用限额；使用自己的 API
-        凭证时，费用由供应商账户结算。到期不会自动扣费或删除学习资料。</text
-      ></view
+      ><text class="note">AI 服务暂未开通 · 到期不自动扣费</text></view
     >
     <view v-if="notices.length" class="panel"
       ><text class="section-title">家庭提醒</text

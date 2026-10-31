@@ -325,15 +325,10 @@ function submitFeedback(kind: "report" | "correction") {
         ><text class="math-text">{{
           problem.current_text?.text || "请先返回校对页，确认题干后再分析。"
         }}</text
-        ><text class="note"
-          >仅发送已确认题干、年级和下方填写的作答；本轮不发送图片。含图形条件时，请先将必要条件补充到题干。</text
-        ></view
+        ><text class="note">仅发送已确认题干与作答</text></view
       >
       <view v-if="guardian" class="panel">
         <text class="section-title">提交学习线索</text>
-        <text class="note"
-          >可填写孩子当时的答案与步骤。暂未提供作答时，只能给解题线索，无法判断具体错误原因。</text
-        >
         <textarea
           v-model="work"
           aria-label="孩子原作答"
@@ -342,9 +337,7 @@ function submitFeedback(kind: "report" | "correction") {
           :disabled="busy || pending"
           placeholder="填写当时的作答与步骤（可留空）"
         />
-        <view v-if="!outbound || !models.length" class="empty"
-          >分析服务尚未开放或未配置可用模型。你仍可整理题目、补充作答，稍后重新载入。</view
-        >
+        <view v-if="!outbound || !models.length" class="empty">分析服务尚未开放</view>
         <template v-else>
           <picker
             :range="modelNames"
