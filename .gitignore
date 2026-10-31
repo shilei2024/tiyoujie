@@ -24,3 +24,4 @@ artifacts/
 # WeChat DevTools local artifacts (uni-app build output lives in frontend/dist/)
 /project.config.json
 /project.private.config.json
+/frontend/pnpm-lock.yaml
