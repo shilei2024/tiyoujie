@@ -85,7 +85,7 @@ export function confirmAction(content: string): Promise<boolean> {
     uni.showModal({
       title: "请确认",
       content,
-      confirmColor: "#315b45",
+      confirmColor: "#2563eb",
       success: (result) => resolve(result.confirm),
       fail: () => resolve(false),
     }),

@@ -161,7 +161,7 @@ onLoad((options) => {
       >
     </view>
     <view v-if="sheet && !sheet.items.length" class="panel">
-      <text class="note">题单还是空的。家长可以从上面的列表加入错题。</text>
+      <text class="note">题单为空</text>
     </view>
     <view v-for="item in sheet?.items || []" :key="item.id" class="panel">
       <view class="toolbar"
@@ -261,7 +261,7 @@ onLoad((options) => {
   margin: 0;
 }
 .answer {
-  background: #f0f3ec;
+  background: #f5f6f8;
   padding: 14px;
   border-radius: 8px;
   margin-top: 12px;

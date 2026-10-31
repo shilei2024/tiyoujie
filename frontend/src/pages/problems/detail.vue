@@ -11,7 +11,7 @@ import {
   type Problem,
   type TextVersion,
 } from "../../api/problems";
-import { session } from "../../state";
+import { navHint, session } from "../../state";
 // #ifdef H5
 import { cropBrowserImage } from "../../api/problems";
 // #endif
@@ -264,9 +264,8 @@ async function removeImage() {
   });
 }
 function back() {
-  uni.redirectTo({
-    url: `/pages/problems/index?child_id=${problem.value?.child_id || ""}`,
-  });
+  if (problem.value?.child_id) navHint.childId = problem.value.child_id;
+  uni.switchTab({ url: "/pages/problems/index" });
 }
 function openAnalysis() {
   uni.navigateTo({ url: `/pages/analysis/index?id=${id.value}` });
@@ -603,11 +602,7 @@ async function remove() {
 <template>
   <view class="page detail-page"
     ><button class="text-button" @click="back">← 返回错题本</button>
-    <view class="intro"
-      ><text class="eyebrow">认真核对，比匆忙确认更有用。</text
-      ><text class="heading">错题校对</text
-      ><text class="muted">图片和识别仅提供线索，题干由你确认。</text></view
-    >
+    <view class="intro"><text class="heading">错题校对</text></view>
     <view v-if="message" class="feedback" role="status">{{ message }}</view>
     <template v-if="problem && session.user">
       <view class="workspace">
@@ -735,7 +730,7 @@ async function remove() {
                 ><checkbox
                   value="privacy"
                   :checked="privacyConfirmed"
-                  color="#315b45"
+                  color="#2563eb"
                 />我已确认预览中没有不必要的身份信息</label
               ></checkbox-group
             >
@@ -866,7 +861,7 @@ async function remove() {
                   ><checkbox
                     value="confirm"
                     :checked="textConfirmed"
-                    color="#315b45"
+                    color="#2563eb"
                     :disabled="busy"
                   />我已核对题干，确认保存此版本</label
                 ></checkbox-group
@@ -948,13 +943,13 @@ async function remove() {
                   ><radio
                     value="platform_trial"
                     :checked="mode === 'platform_trial'"
-                    color="#315b45"
+                    color="#2563eb"
                   />平台限额体验</label
                 ><label
                   ><radio
                     value="byok"
                     :checked="mode === 'byok'"
-                    color="#315b45"
+                    color="#2563eb"
                   />我的 API</label
                 ></radio-group
               >
@@ -964,9 +959,7 @@ async function remove() {
                 点；还受平台预算与服务状态限制。</text
               >
               <template v-else
-                ><text class="note"
-                  >费用由你自己的供应商账户承担，功能会员不抵扣供应商费用。</text
-                ><picker
+                ><text class="note">费用由你的供应商账户承担。</text><picker
                   :range="usableCredentials"
                   range-key="masked_key"
                   @change="
@@ -991,7 +984,7 @@ async function remove() {
                   ><checkbox
                     value="cost"
                     :checked="costConfirmed"
-                    color="#315b45"
+                    color="#2563eb"
                   />我有监护权限，已阅读第三方处理说明，同意按所选模式发送此图并承担相应费用</label
                 ></checkbox-group
               >
@@ -1129,8 +1122,8 @@ async function remove() {
   width: 100%;
   height: auto;
   margin: 18px 0;
-  border-radius: 6px;
-  background: #f0f1ea;
+  border-radius: 12px;
+  background: #f5f6f8;
 }
 .editor {
   box-sizing: border-box;
@@ -1138,9 +1131,9 @@ async function remove() {
   min-height: 180px;
   padding: 14px;
   margin: 16px 0;
-  border: 1px solid #d5ded3;
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  background: #fbfcfd;
   font-size: 15px;
   line-height: 1.9;
   white-space: pre-wrap;

@@ -130,7 +130,8 @@ onShow(() => {
       <text v-else class="note">学生账号可以练习家长创建的题单。</text>
     </view>
     <view v-if="!items.length" class="panel">
-      <text class="note">还没有题单。家长可新建题单，再从错题本加入题目。</text>
+      <text class="note">暂无题单</text>
+      <button class="text-button" @click="run(() => load())">重试</button>
     </view>
     <view v-for="item in items" :key="item.id" class="panel">
       <view class="toolbar"

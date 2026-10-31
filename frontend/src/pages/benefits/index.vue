@@ -88,19 +88,13 @@ function claim(campaign: Campaign) {
   });
 }
 function back() {
-  uni.reLaunch({ url: "/pages/index/index" });
+  uni.switchTab({ url: "/pages/index/index" });
 }
 </script>
 <template>
   <view class="page">
     <button class="text-button" @click="back">← 返回家庭档案</button>
-    <view class="intro"
-      ><text class="eyebrow">看得清楚，用得安心。</text
-      ><text class="heading">家庭免费权益</text
-      ><text class="muted">{{
-        session.family?.name || "请先登录并选择家庭"
-      }}</text></view
-    >
+    <view class="intro"><text class="heading">免费权益</text></view>
     <view v-if="message" class="feedback" role="status">{{ message }}</view>
     <view class="panel"
       ><text class="section-title">当前档案额度</text

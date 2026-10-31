@@ -128,7 +128,7 @@ function resetReveal() {
 }
 watch(() => selected.value?.id, resetReveal);
 function openSettings() {
-  uni.navigateTo({ url: "/pages/settings/index" });
+  uni.switchTab({ url: "/pages/settings/index" });
 }
 async function loadResults(append = false) {
   const result = await api<{ results: AnalysisItem[]; next: number | null }>(
@@ -310,14 +310,7 @@ function submitFeedback(kind: "report" | "correction") {
 <template>
   <view class="page">
     <button class="text-button" @click="back">← 返回错题校对</button>
-    <view class="intro"
-      ><text class="eyebrow">从线索出发，先想一步。</text
-      ><text class="heading">分析与提示</text
-      ><text class="note"
-        >先看提示，再决定是否展开完整解析。AI
-        内容均待核验，不能代替数学验证。</text
-      ></view
-    >
+    <view class="intro"><text class="heading">分析与提示</text></view>
     <view v-if="message" class="feedback" role="status">{{ message }}</view>
     <view v-if="!session.user" class="panel"
       >请先返回家庭页登录，再打开本题。</view
@@ -381,9 +374,7 @@ function submitFeedback(kind: "report" | "correction") {
             </button></view
           >
           <text v-if="mode === 'platform_trial'" class="note"
-            >平台剩余体验点：{{ remaining }}；本次
-            {{ model?.analysis_quota_units || 1 }} 点。与 OCR
-            共用预算；会员权益不包含无限 AI。</text
+            >剩余体验点 {{ remaining }} · 本次 {{ model?.analysis_quota_units || 1 }} 点</text
           >
           <template v-else
             ><text class="note"
@@ -416,7 +407,7 @@ function submitFeedback(kind: "report" | "correction") {
                 value="confirm"
                 :checked="costConfirmed"
                 :disabled="busy || pending"
-                color="#315b45"
+                color="#2563eb"
               />我已阅读第三方处理说明，并确认本次内容与费用方式</label
             ></checkbox-group
           >
@@ -622,13 +613,13 @@ function submitFeedback(kind: "report" | "correction") {
   width: 100%;
   min-height: 150px;
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid #dce2d8;
+  background: #fbfcfd;
+  border: 1px solid #eef0f4;
   padding: 14px;
   font-size: 16px;
   line-height: 1.8;
   margin: 16px 0;
-  border-radius: 6px;
+  border-radius: 12px;
 }
 .math-text {
   display: block;
@@ -650,9 +641,9 @@ function submitFeedback(kind: "report" | "correction") {
 }
 .picker-field {
   padding: 14px;
-  border: 1px solid #dce2d8;
+  border: 1px solid #eef0f4;
   margin: 12px 0;
-  border-radius: 6px;
+  border-radius: 12px;
 }
 .check-line {
   display: flex;
@@ -666,7 +657,7 @@ function submitFeedback(kind: "report" | "correction") {
   gap: 12px;
   justify-content: space-between;
   padding: 18px 0;
-  border-bottom: 1px solid #e6e9df;
+  border-bottom: 1px solid #eef0f4;
   line-height: 1.8;
 }
 .hint {
@@ -679,7 +670,7 @@ function submitFeedback(kind: "report" | "correction") {
 .feedback-section {
   margin-top: 28px;
   padding-top: 24px;
-  border-top: 1px solid #dce2d8;
+  border-top: 1px solid #eef0f4;
 }
 .full-analysis .section-title {
   margin-top: 20px;

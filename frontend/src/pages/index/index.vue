@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import CustomTabBar from "../../components/custom-tab-bar/index.vue";
 import { api, confirmAction, errorText, familyQuery } from "../../api/client";
 import {
   clearSession,
+  navHint,
   session,
   setLogin,
   type Family,
@@ -286,8 +288,20 @@ async function removeMember(id: string) {
     await loadChildren();
   });
 }
+const TAB_PAGES = [
+  "/pages/index/index",
+  "/pages/problems/index",
+  "/pages/practice/index",
+  "/pages/settings/index",
+];
 function navigate(url: string) {
-  uni.navigateTo({ url });
+  const path = url.split("?")[0];
+  if (TAB_PAGES.includes(path)) uni.switchTab({ url: path });
+  else uni.navigateTo({ url });
+}
+function openChildProblems(child: Child) {
+  navHint.childId = child.id;
+  uni.switchTab({ url: "/pages/problems/index" });
 }
 function logout() {
   void run(async () => {
@@ -321,19 +335,8 @@ async function deleteAccount() {
 </script>
 
 <template>
-  <view class="page">
-    <view class="brand"
-      ><text class="brand-name">题有解</text
-      ><text class="muted small">学习的每一步，都算数</text></view
-    >
-    <view class="intro"
-      ><text class="eyebrow">让进步，有迹可循。</text
-      ><text class="heading"
-        >从一份<text class="accent">学习档案</text>开始。</text
-      ><text class="muted"
-        >管理家庭与孩子资料，为接下来的错题学习做好准备。</text
-      ></view
-    >
+  <view class="page page-tab">
+    <view class="brand"><text class="brand-name">题有解</text></view>
     <view v-if="message" class="feedback" role="status" aria-live="polite">{{
       message
     }}</view>
@@ -343,14 +346,10 @@ async function deleteAccount() {
     <view v-if="!session.user" class="panel">
       <view v-if="setupOnly" class="inset">
         <text class="section-title">小程序界面预览</text>
-        <text class="note"
-          >后端服务尚未连接。连接后才能登录、保存学习资料和管理错题；当前预览不会发送登录或题目请求。</text
-        >
+        <text class="note">后端未连接，仅界面预览</text>
       </view>
       <text class="section-title">登录题有解</text>
-      <text class="note"
-        >微信登录需在小程序中完成。登录会话仅保存在当前页面内存，刷新后需重新登录。</text
-      >
+      <text class="note">微信登录需在小程序中完成</text>
       <button
         class="primary"
         :disabled="busy || !capabilities.wechat_configured"
@@ -436,12 +435,11 @@ async function deleteAccount() {
             session.family.role === "student" ? "学生 · 只读" : "监护人"
           }}</text></view
         >
-        <text class="note">只填写学习所需资料，使用昵称即可。</text>
         <view v-if="!children.length" class="empty">暂无可访问的孩子档案</view>
         <view v-for="child in children" :key="child.id" class="child-row">
           <button
             class="text-button"
-            @click="navigate('/pages/problems/index?child_id=' + child.id)"
+            @click="openChildProblems(child)"
           >
             查看错题本 →
           </button>
@@ -522,7 +520,7 @@ async function deleteAccount() {
                 ><checkbox
                   value="yes"
                   :checked="guardianConfirmed"
-                  color="#315b45"
+                  color="#2563eb"
                   :disabled="busy"
                 />我已阅读，并以监护人身份同意</label
               ></checkbox-group
@@ -549,20 +547,20 @@ async function deleteAccount() {
       </view>
       <view v-if="session.family" class="link-grid"
         ><button class="nav-card" @click="navigate('/pages/problems/index')">
-          <text class="section-title">我的错题本</text
-          ><text class="note">图片、题干与人工校对 →</text></button
+          <text class="section-title">错题本</text
+          ><text class="muted">→</text></button
         ><button class="nav-card" @click="navigate('/pages/practice/index')">
-          <text class="section-title">今日复习</text
-          ><text class="note">间隔复习与学习趋势 →</text></button
+          <text class="section-title">智能复习</text
+          ><text class="muted">→</text></button
         ><button class="nav-card" @click="navigate('/pages/worksheets/index')">
           <text class="section-title">练习题单</text
-          ><text class="note">组题、作答与导出 →</text></button
+          ><text class="muted">→</text></button
         ><button class="nav-card" @click="navigate('/pages/settings/index')">
-          <text class="section-title">AI 设置</text
-          ><text class="note">管理自己的服务凭证 →</text></button
+          <text class="section-title">我的</text
+          ><text class="muted">→</text></button
         ><button class="nav-card" @click="navigate('/pages/benefits/index')">
           <text class="section-title">免费权益</text
-          ><text class="note">查看家庭功能与到期时间 →</text>
+          ><text class="muted">→</text>
         </button></view
       >
       <view class="panel">
@@ -592,13 +590,13 @@ async function deleteAccount() {
               ><radio
                 value="student"
                 :checked="inviteRole === 'student'"
-                color="#315b45"
+                color="#2563eb"
               />学生（只读）</label
             ><label
               ><radio
                 value="guardian"
                 :checked="inviteRole === 'guardian'"
-                color="#315b45"
+                color="#2563eb"
               />监护人（可管理）</label
             ></radio-group
           >
@@ -653,6 +651,6 @@ async function deleteAccount() {
         </button></view
       >
     </template>
-    <text class="footnote">用认真，陪伴每一次进步。</text>
+    <CustomTabBar :active="0" />
   </view>
 </template>

@@ -3,7 +3,8 @@ import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { api, errorText, familyQuery } from "../../api/client";
 import { type Problem } from "../../api/problems";
-import { session } from "../../state";
+import { navHint, session } from "../../state";
+import CustomTabBar from "../../components/custom-tab-bar/index.vue";
 
 interface Child {
   id: string;
@@ -54,6 +55,10 @@ async function load(append = false) {
   count.value = result.count;
 }
 onShow(() => {
+  if (navHint.childId) {
+    childId.value = navHint.childId;
+    navHint.childId = "";
+  }
   if (session.user && session.family)
     void run(async () => {
       const all: Child[] = [];
@@ -86,18 +91,13 @@ function create() {
   });
 }
 function back() {
-  uni.reLaunch({ url: "/pages/index/index" });
+  uni.switchTab({ url: "/pages/index/index" });
 }
 </script>
 <template>
-  <view class="page"
-    ><button class="text-button" @click="back">← 返回家庭档案</button>
+  <view class="page page-tab">
     <view class="intro"
-      ><text class="eyebrow">留下问题，也留下成长。</text
-      ><text class="heading">我的错题本</text
-      ><text class="muted">{{
-        session.family?.name || "请先登录并选择家庭"
-      }}</text></view
+      ><text class="heading">错题本</text></view
     >
     <view v-if="message" class="feedback" role="status">{{ message }}</view>
     <template v-if="session.user && session.family">
@@ -161,10 +161,11 @@ function back() {
           >先选择一个孩子，再开始录入。</text
         >
       </view>
-      <view v-if="!items.length" class="panel empty"
-        >还没有符合条件的错题。可以先手动录入，图片与 OCR
-        结果都需要人工核对。</view
-      >
+      <view v-if="!items.length" class="panel empty">暂无错题<button
+          class="text-button"
+          @click="run(() => load())"
+          >重试</button
+        ></view>
       <view v-for="item in items" :key="item.id" class="panel"
         ><view class="row"
           ><text class="small muted"
@@ -172,13 +173,22 @@ function back() {
               children.find((child) => child.id === item.child_id)?.nickname
             }}
             · {{ item.chapter || "章节待整理" }}</text
-          ><text class="badge">{{
-            item.status === "confirmed"
-              ? "题干已确认"
-              : item.status === "needs_review"
-                ? "OCR 待校对"
-                : "待录入"
-          }}</text></view
+          ><text
+            :class="
+              'badge' +
+              (item.status === 'confirmed'
+                ? ' badge-success'
+                : item.status === 'needs_review'
+                  ? ' badge-warning'
+                  : '')
+            "
+            >{{
+              item.status === "confirmed"
+                ? "题干已确认"
+                : item.status === "needs_review"
+                  ? "OCR 待校对"
+                  : "待录入"
+            }}</text></view
         >
         <text class="question-preview">{{
           item.current_text?.text || "待录入的错题"
@@ -199,6 +209,7 @@ function back() {
         加载更多错题
       </button>
     </template>
+    <CustomTabBar :active="1" />
   </view>
 </template>
 <style scoped>

@@ -9,6 +9,7 @@ import {
   secureTransport,
 } from "../../api/client";
 import { session } from "../../state";
+import CustomTabBar from "../../components/custom-tab-bar/index.vue";
 interface Credential {
   id: string;
   provider: string;
@@ -115,31 +116,19 @@ async function remove(item: Credential) {
   });
 }
 function back() {
-  uni.reLaunch({ url: "/pages/index/index" });
+  uni.switchTab({ url: "/pages/index/index" });
 }
 </script>
 <template>
-  <view class="page">
-    <button class="text-button" @click="back">← 返回家庭档案</button>
-    <view class="intro"
-      ><text class="eyebrow">自己的凭证，自己掌握。</text
-      ><text class="heading">AI 设置</text
-      ><text class="muted">{{
-        session.family?.name || "请先登录并选择家庭"
-      }}</text></view
-    >
+  <view class="page page-tab">
+    <view class="intro"><text class="heading">我的</text></view>
     <view v-if="message" class="feedback" role="status">{{ message }}</view>
     <view class="panel"
-      ><text class="section-title">服务与费用</text
-      ><text class="note"
-        >使用自有凭证时，费用由对应供应商账户承担；服务是否开放以题目页显示为准。免费功能权益不代表
-        AI 无限使用。使用平台额度与自有凭证须由你明确选择。</text
-      ></view
+      ><text class="section-title">会员与付费</text
+      ><text class="note">暂未开通</text></view
     >
     <view v-if="!canManage" class="panel"
-      ><text class="note"
-        >请以监护人身份登录并选择家庭后管理自己的凭证。学生没有凭证管理权限。</text
-      ></view
+      ><text class="note">仅监护人可管理凭证</text></view
     >
     <template v-else>
       <view class="panel"
@@ -201,13 +190,13 @@ function back() {
             ><radio
               value="deepseek"
               :checked="provider === 'deepseek'"
-              color="#315b45"
+              color="#2563eb"
             />DeepSeek</label
           ><label
             ><radio
               value="kimi"
               :checked="provider === 'kimi'"
-              color="#315b45"
+              color="#2563eb"
             />Kimi</label
           ></radio-group
         >
@@ -236,5 +225,6 @@ function back() {
         </button>
       </view>
     </template>
+    <CustomTabBar :active="3" />
   </view>
 </template>

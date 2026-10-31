@@ -30,3 +30,8 @@ export function clearSession() {
   session.user = null;
   session.family = null;
 }
+
+// Navigation-only hint for handing a child filter to the 错题本 tab.
+// uni.switchTab cannot carry query params, so the child id is stashed here
+// (session memory only, never persisted, not business data).
+export const navHint = reactive({ childId: "" });

@@ -13,6 +13,7 @@ import {
   type Trend,
 } from "../../api/practice";
 import { session } from "../../state";
+import CustomTabBar from "../../components/custom-tab-bar/index.vue";
 
 interface Child {
   id: string;
@@ -114,9 +115,9 @@ onShow(() => {
 </script>
 
 <template>
-  <view class="page">
+  <view class="page page-tab">
     <view class="toolbar"
-      ><text class="brand-name">今日复习</text
+      ><text class="brand-name">智能复习</text
       ><text class="badge">间隔复习</text></view
     >
     <view class="panel">
@@ -131,10 +132,7 @@ onShow(() => {
         ></picker
       >
       <text v-else class="note">还没有孩子档案，请先在首页创建。</text>
-      <text class="note"
-        >复习间隔为 1、3、7、14、30、60、120 天；答错会回到 1
-        天。全部按本地日历日计算，不调用 AI。</text
-      >
+      <text class="note">间隔 1·3·7·14·30·60·120 天</text>
     </view>
     <view v-if="queue" class="panel">
       <view class="toolbar"
@@ -147,9 +145,11 @@ onShow(() => {
         ><text class="note">复习中 {{ queue.counts.review }}</text
         ><text class="note">已掌握 {{ queue.counts.mastered }}</text></view
       >
-      <text v-if="!queue.results.length" class="note"
-        >今天没有待复习的题目。可以到错题本添加新错题，或创建题单练习。</text
-      >
+      <text v-if="!queue.results.length" class="note">今日无待复习<button
+          class="text-button"
+          @click="run(() => load())"
+          >重试</button
+        ></text>
       <view v-for="row in queue.results" :key="row.problem_id" class="task">
         <view class="toolbar"
           ><text class="badge">{{ stageText[row.stage] || row.stage }}</text
@@ -167,21 +167,21 @@ onShow(() => {
         >
         <view class="row actions"
           ><button
-            class="secondary"
+            class="secondary success-button"
             :disabled="grading === row.problem_id"
             @click="grade(row, 'correct')"
           >
             答对
           </button>
           <button
-            class="secondary"
+            class="secondary warning-button"
             :disabled="grading === row.problem_id"
             @click="grade(row, 'unsure')"
           >
             不确定
           </button>
           <button
-            class="secondary"
+            class="secondary danger-button"
             :disabled="grading === row.problem_id"
             @click="grade(row, 'wrong')"
           >
@@ -226,6 +226,7 @@ onShow(() => {
       </button>
     </view>
     <text v-if="message" class="notice" role="status">{{ message }}</text>
+    <CustomTabBar :active="2" />
   </view>
 </template>
 
@@ -237,7 +238,7 @@ onShow(() => {
   margin: 12px 0;
 }
 .task {
-  border-top: 1px solid #dce2d8;
+  border-top: 1px solid #eef0f4;
   padding-top: 18px;
   margin-top: 18px;
 }
@@ -266,7 +267,7 @@ onShow(() => {
 .bar {
   width: 100%;
   min-height: 2px;
-  background: #315b45;
+  background: #2563eb;
   border-radius: 4px 4px 0 0;
 }
 .question {

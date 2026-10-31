@@ -222,9 +222,7 @@ onHide(() => {
       ><text v-if="truncated" class="note"
         >候选较多，本次比较前 200 题，请增加筛选条件。</text
       >
-      <text v-if="searched && !items.length" class="note"
-        >暂未找到符合条件的已审核题目。题库准备和审核完成后，结果会在这里显示。</text
-      >
+      <text v-if="searched && !items.length" class="note">暂无符合条件的题目</text>
     </view>
     <view v-if="guardian && items.length" class="panel">
       <text class="section-title">举一反三方向</text>
@@ -340,12 +338,12 @@ onHide(() => {
   margin: 12px 0;
 }
 .draft {
-  border-top: 1px solid #dce2d8;
+  border-top: 1px solid #eef0f4;
   padding-top: 20px;
   margin-top: 20px;
 }
 .answer {
-  background: #f0f3ec;
+  background: #f5f6f8;
   padding: 16px;
   border-radius: 8px;
   margin-top: 16px;
